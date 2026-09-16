@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 
 interface PanelProps {
   title: string
+  /** Korte sleutel; bepaalt op mobiel de volgorde (zie theme.css). */
+  name?: string
   meta?: ReactNode
   linkLabel?: string
   onLink?: () => void
@@ -10,9 +12,9 @@ interface PanelProps {
   tight?: boolean
 }
 
-export function Panel({ title, meta, linkLabel, onLink, children, footer, tight }: PanelProps) {
+export function Panel({ title, name, meta, linkLabel, onLink, children, footer, tight }: PanelProps) {
   return (
-    <section className="panel">
+    <section className="panel" data-panel={name}>
       <header className="panel__head">
         <h2 className="panel__title">{title}</h2>
         {meta ? <div className="panel__meta">{meta}</div> : null}

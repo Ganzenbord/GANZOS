@@ -17,7 +17,7 @@ export function FinancePanel({
 }) {
   if (finance.connected_accounts === 0) {
     return (
-      <Panel title="Finance">
+      <Panel title="Finance" name="finance">
         <div className="bignum">{money('0')}</div>
         <div className="numlabel">Totaal vermogen</div>
         <EmptyState
@@ -35,6 +35,7 @@ export function FinancePanel({
   return (
     <Panel
       title="Finance"
+      name="finance"
       meta={
         finance.stale ? (
           <StatusDot tone="warn" label="Verouderd" />

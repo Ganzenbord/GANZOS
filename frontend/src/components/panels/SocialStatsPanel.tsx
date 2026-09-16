@@ -17,7 +17,7 @@ export function SocialStatsPanel({
 }) {
   if (social.channels_total === 0) {
     return (
-      <Panel title="Social media stats">
+      <Panel title="Social media stats" name="social">
         <EmptyState
           title="Nog geen social-kanalen gekoppeld"
           hint="Koppel YouTube, Instagram of TikTok om het totaal te zien."
@@ -31,6 +31,7 @@ export function SocialStatsPanel({
   return (
     <Panel
       title="Social media stats"
+      name="social"
       meta={<StatusDot tone="ok" label={`${social.channels_counted} kanalen`} />}
       linkLabel="Alles bekijken"
       onLink={onOpen}

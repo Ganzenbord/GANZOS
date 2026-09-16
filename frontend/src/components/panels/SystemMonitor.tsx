@@ -38,6 +38,7 @@ export function SystemMonitor({ system }: { system: SystemStatus }) {
   return (
     <Panel
       title="System monitor"
+      name="system"
       meta={<StatusDot tone={toneFor(system.status)} label={system.status_detail} />}
     >
       <div className="meters">

@@ -14,7 +14,7 @@ export function GanzCircle({ core, busy }: { core: CoreStatus; busy: boolean }) 
         : core.core_detail
 
   return (
-    <section className="panel">
+    <section className="panel" data-panel="circle">
       <div className="circle-panel">
         <div>
           <div className={busy ? 'circle circle--busy' : 'circle'}>

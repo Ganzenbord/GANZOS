@@ -10,7 +10,7 @@ import { StatusDot, toneFor } from '../ui/StatusDot'
  *  De gegevens en de API zijn ongewijzigd — alleen de plaats op het scherm is anders. */
 export function MissionPanel({ missions }: { missions: Mission[] }) {
   return (
-    <Panel title="Mission / tasks" meta="Vandaag" tight>
+    <Panel title="Mission / tasks" name="missions" meta="Vandaag" tight>
       {missions.length === 0 ? (
         <EmptyState title="Geen missies gepland" hint="Ganz heeft vandaag niets in de planning." />
       ) : (

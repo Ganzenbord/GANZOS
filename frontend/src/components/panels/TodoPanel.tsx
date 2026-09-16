@@ -78,6 +78,7 @@ export function TodoPanel({ todo, canWrite, onChanged, onOpenAll }: TodoPanelPro
   return (
     <Panel
       title="To do list"
+      name="todo"
       meta={`${todo.completed} / ${todo.total} voltooid`}
       linkLabel="Alles bekijken"
       onLink={onOpenAll}

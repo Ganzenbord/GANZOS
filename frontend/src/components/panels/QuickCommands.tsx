@@ -10,7 +10,7 @@ interface Command {
 
 export function QuickCommands({ commands }: { commands: Command[] }) {
   return (
-    <Panel title="Quick commands">
+    <Panel title="Quick commands" name="quick">
       <div className="quick">
         {commands.map((command) => (
           <button

@@ -54,7 +54,7 @@ export function CoreOverview({ core }: { core: CoreStatus }) {
   ]
 
   return (
-    <Panel title="Core overzicht" tight>
+    <Panel title="Core overzicht" name="core" tight>
       <div className="rows">
         {rows.map((row) => (
           <div className="rowitem" key={row.label}>

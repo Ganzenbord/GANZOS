@@ -14,7 +14,7 @@ function kindOf(action: string): { tag: string; tone: 'ok' | 'warn' | 'error' | 
 
 export function LiveFeed({ items, onOpen }: { items: FeedItem[]; onOpen?: () => void }) {
   return (
-    <Panel title="Live intelligence feed" linkLabel="Alles bekijken" onLink={onOpen} tight>
+    <Panel title="Live intelligence feed" name="feed" linkLabel="Alles bekijken" onLink={onOpen} tight>
       {items.length === 0 ? (
         <EmptyState title="Nog niets gebeurd" hint="Zodra Ganz iets doet, staat het hier." />
       ) : (

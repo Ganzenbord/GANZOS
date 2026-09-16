@@ -6,7 +6,7 @@ import { StatusDot, toneFor } from '../ui/StatusDot'
 
 export function MemoryInsights({ memory }: { memory: { memories: number; sessions: number } }) {
   return (
-    <Panel title="Memory insights">
+    <Panel title="Memory insights" name="memory">
       <div className="stats">
         <div className="stat">
           <div className="stat__value">{memory.memories}</div>
@@ -23,7 +23,7 @@ export function MemoryInsights({ memory }: { memory: { memories: number; session
 
 export function LlmStatusPanel({ providers }: { providers: LlmStatus[] }) {
   return (
-    <Panel title="LLM status" tight>
+    <Panel title="LLM status" name="llm" tight>
       {providers.length === 0 ? (
         <EmptyState
           title="Geen taalmodel gekoppeld"

@@ -370,7 +370,17 @@ input, select, textarea { font: inherit; }
 
 /* ---------- Lege en foutstaten ---------- */
 
-.empty { padding: 20px 6px; text-align: center; color: var(--text-dim); font-size: 12.5px; }
+.empty {
+  padding: 20px 6px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
 .empty__title { color: var(--text-muted); font-size: 13px; margin-bottom: 4px; }
 .empty__action {
   margin-top: 10px; display: inline-flex; align-items: center; gap: 5px;
@@ -468,7 +478,24 @@ input, select, textarea { font: inherit; }
 @media (max-width: 768px) {
   .sidebar { display: none; }
   .page { padding: 12px 16px 84px; }
-  .row--money, .row--core, .row--work, .row--status { grid-template-columns: 1fr; }
+  .page { display: flex; flex-direction: column; }
+  .row { display: contents; }
+
+  /* De volgorde waarin je het onderweg nodig hebt: eerst wat er te doen staat,
+     dan het geld, de kanalen en de uploads. De rest komt daarna. */
+  [data-panel='core'] { order: 1; }
+  [data-panel='circle'] { order: 2; }
+  [data-panel='todo'] { order: 3; }
+  [data-panel='feed'] { order: 4; }
+  [data-panel='finance'] { order: 5; }
+  [data-panel='social'] { order: 6; }
+  [data-panel='uploads'] { order: 7; }
+  [data-panel='quick'] { order: 8; }
+  [data-panel='missions'] { order: 9; }
+  [data-panel='llm'] { order: 10; }
+  [data-panel='system'] { order: 11; }
+  [data-panel='memory'] { order: 12; }
+  .panel { margin-bottom: var(--gap); }
   .topbar { padding: 0 16px; gap: 10px; }
   .topbar__clock { display: none; }
   .bignum { font-size: 25px; }

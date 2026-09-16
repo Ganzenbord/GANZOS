@@ -71,7 +71,7 @@ export function UploadSchedulePanel({
   const offset = useServerOffset(uploads.server_time)
 
   return (
-    <Panel title="Channel upload schedule" linkLabel="Alles bekijken" onLink={onOpen} tight>
+    <Panel title="Channel upload schedule" name="uploads" linkLabel="Alles bekijken" onLink={onOpen} tight>
       {uploads.channels.length === 0 ? (
         <EmptyState
           title="Nog geen kanalen"
