@@ -1,0 +1,33 @@
+# Geheimen en lokale instellingen
+.env
+.env.local
+*.env.local
+secrets/
+tokens/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+dist-electron/
+build/
+.vite/
+
+# Besturingssysteem
+.DS_Store
+Thumbs.db
+
+# Logboeken
+*.log
+logs/
+
+# Build-artefact van TypeScript
+*.tsbuildinfo

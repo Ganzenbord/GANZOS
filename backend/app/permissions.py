@@ -1,0 +1,68 @@
+"""Het rechtenregister.
+
+Eén lijst met alle rechten, zodat je in één oogopslag ziet wie wat mag. Tier 1 is de
+eigenaar; hoe hoger het tiernummer, hoe minder rechten. Een gebruiker mag een recht
+als zijn tier kleiner of gelijk is aan `max_tier`.
+
+`sensitive` betekent: deze handeling vraagt een tweede bevestiging met het wachtwoord
+voordat hij wordt uitgevoerd.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from app.models.user import TIER_GUEST, TIER_LIMITED, TIER_OWNER, TIER_TRUSTED
+
+
+@dataclass(frozen=True)
+class Permission:
+    key: str
+    description: str
+    max_tier: int
+    sensitive: bool = False
+
+
+PERMISSIONS: tuple[Permission, ...] = (
+    Permission("core.read", "Ganz Core en de status bekijken", TIER_GUEST),
+    Permission("system.read", "Systeemmonitor bekijken", TIER_LIMITED),
+    Permission("activity.read", "Activiteitenlog bekijken", TIER_TRUSTED),
+    Permission("skills.read", "Skills bekijken", TIER_LIMITED),
+    Permission("tasks.read", "Missies en taken bekijken", TIER_LIMITED),
+    Permission("memory.read", "Geheugen bekijken", TIER_TRUSTED),
+    Permission("conversations.read", "Gesprekken bekijken", TIER_TRUSTED),
+    Permission("workflows.read", "Workflows bekijken", TIER_TRUSTED),
+    Permission("integrations.read", "Integraties bekijken", TIER_TRUSTED),
+    Permission("integrations.manage", "Integraties koppelen of loskoppelen", TIER_OWNER, True),
+    # To-do
+    Permission("todo.read", "Dagelijkse takenlijst bekijken", TIER_LIMITED),
+    Permission("todo.write", "Taken maken, wijzigen en afvinken", TIER_TRUSTED),
+    # Finance: gevoelig, dus alleen de eigenaar.
+    Permission("finance.read", "Financieel overzicht bekijken", TIER_OWNER),
+    Permission("finance.manage", "Financiële accounts koppelen of wijzigen", TIER_OWNER, True),
+    # Social
+    Permission("social.read", "Social-statistieken bekijken", TIER_LIMITED),
+    Permission("social.manage", "Kanalen koppelen of verwijderen", TIER_TRUSTED, True),
+    # Uploads
+    Permission("upload.read", "Uploadschema bekijken", TIER_LIMITED),
+    Permission("upload.schedule", "Uploads inplannen of wijzigen", TIER_TRUSTED),
+    Permission("upload.execute", "Een upload nu uitvoeren", TIER_OWNER, True),
+)
+
+PERMISSION_MAP: dict[str, Permission] = {perm.key: perm for perm in PERMISSIONS}
+
+
+def get_permission(key: str) -> Permission:
+    try:
+        return PERMISSION_MAP[key]
+    except KeyError as exc:  # pragma: no cover - programmeerfout
+        raise KeyError(f"Onbekend recht: {key}") from exc
+
+
+def tier_allows(tier: int, key: str) -> bool:
+    return tier <= get_permission(key).max_tier
+
+
+def permissions_for_tier(tier: int) -> list[str]:
+    """Wat deze tier mag. De frontend verbergt hiermee wat toch niet werkt."""
+    return [perm.key for perm in PERMISSIONS if tier <= perm.max_tier]
