@@ -128,6 +128,21 @@ die schakelaar dan weg.
 Een zip is voor eigen gebruik prima: uitpakken en `Ganz.exe` (of `Ganz.app`) starten. Er is
 dan alleen geen snelkoppeling in het startmenu.
 
+### Of laat GitHub het doen
+
+Heb je maar één van de twee computers, dan hoef je er niet omheen te werken: GitHub heeft
+een Windows-machine én een Mac staan. In `.github/workflows/desktop.yml` staat een opdracht
+die daar allebei de versies bouwt — met installer, met pictogram, precies zoals het hoort.
+
+1. Ga in de repo naar het tabblad **Actions** → *Desktop-app bouwen* → **Run workflow**.
+2. Wacht een minuut of tien.
+3. Onderaan die pagina staan de bestanden onder **Artifacts**.
+
+> De knop **Run workflow** verschijnt pas als dit bestand op de hoofdtak (`main`) staat; zo
+> werkt GitHub nu eenmaal. Staat het nog op een zijtak, zet er dan een versielabel op
+> (`git tag v2.0.1 && git push --tags`) — dan draait hij ook, en komen de bestanden
+> bovendien onder **Releases** te staan met een vaste downloadlink.
+
 Deze builds zijn **niet ondertekend**. Zonder certificaat waarschuwt macOS (Gatekeeper) en
 Windows (SmartScreen) bij het openen dat de maker onbekend is. Voor eigen gebruik kun je dat
 toestaan; wil je het breder verspreiden, dan is code-signing de volgende stap — en dat kost
@@ -158,7 +173,9 @@ beslissingen nemen staan met opzet in aparte modules (`electron/settings.cjs` en
 
 ## Wat er nog niet is
 
-- **Geen automatische updates.** Een nieuwe versie installeer je zelf.
+- **Geen automatische updates.** Een nieuwe versie installeer je zelf. (De bestanden die
+  GitHub bouwt hebben wel al een `latest-*.yml` en een blockmap, dus de leidingen voor
+  automatisch bijwerken liggen er — er is alleen nog geen plek waar ze vandaan komen.)
 - **Geen ondertekende builds.** Zie hierboven.
 - **De backend start niet mee als dienst.** Op een machine die altijd aanstaat wil je hem als
   systemd-unit of launchd-job draaien; dat staat er nog niet.
