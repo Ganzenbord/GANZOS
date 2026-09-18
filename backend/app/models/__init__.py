@@ -1,5 +1,6 @@
 """Alle tabellen op één plek, zodat Alembic ze allemaal ziet."""
 
+from app.models.access import UserPermission, UserSession
 from app.models.activity import ActivityAction, ActivityLogEntry
 from app.models.base import Base, TimestampMixin, UtcDateTime, utcnow
 from app.models.confirmation import (
@@ -104,6 +105,8 @@ __all__ = [
     "UploadSchedule",
     "UploadStatus",
     "User",
+    "UserPermission",
+    "UserSession",
     "Video",
     "VideoStatus",
     "VoiceProfile",

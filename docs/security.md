@@ -49,6 +49,17 @@ Voor het enkele geval dat er geen passend recht bestaat is er `require_tier(min_
 wat je afschermt een naam, gebruik dan het register — dan zie je het ook terug in
 `/api/auth/me`.
 
+## Sessies: het enige dat in te trekken is
+
+Een inlogtoken is vijftien minuten geldig en staat nergens; je kunt het niet terughalen. Wat
+je wél kunt terughalen is de sessie eronder: die staat als rij in `user_sessions`, één per
+apparaat, en één rij doorstrepen gooit precies dat apparaat eruit. Dat is wat je nodig hebt
+op het moment dat je je telefoon kwijt bent — en let op: een wachtwoord wijzigen doet dat
+níét, dat raakt bestaande sessies niet aan.
+
+Het vernieuwingstoken wordt bij elk gebruik vervangen. Komt een al vervangen token alsnog
+langs, dan bestaat er een kopie en gaat de hele sessie dicht. Zie [server.md](server.md).
+
 ## Tweede bevestiging
 
 Voor gevoelige handelingen is een inlogtoken niet genoeg. Je haalt eerst een

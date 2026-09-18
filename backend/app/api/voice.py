@@ -213,6 +213,9 @@ async def identify(
         threshold=uitslag.threshold,
         runner_up_confidence=_afgerond(uitslag.runner_up_confidence),
         strong=sterk,
+        # Wél een inlogtoken, géén sessie en dus geen vernieuwingstoken. Een stem is na te
+        # maken en een opname is zo gemaakt; die mag hooguit een kwartier toegang geven, nooit
+        # twee maanden. Wie langer ingelogd wil blijven, logt in met zijn wachtwoord.
         access_token=create_token(
             gebruiker.id, "access", origin="voice", confidence=round(uitslag.confidence, 4)
         ),

@@ -98,8 +98,9 @@ export function Shell({ data, children }: { data: Dashboard | null; children: Re
     (item): item is NavItem => Boolean(item),
   )
 
-  function signOut() {
-    logout()
+  async function signOut() {
+    // Eerst de server laten weten dat dit apparaat eruit mag, dan pas wegnavigeren.
+    await logout()
     navigate('/login', { replace: true })
   }
 
@@ -168,7 +169,7 @@ export function Shell({ data, children }: { data: Dashboard | null; children: Re
             >
               <IconSettings size={15} />
             </button>
-            <button className="avatar" type="button" onClick={signOut} title="Uitloggen">
+            <button className="avatar" type="button" onClick={() => void signOut()} title="Uitloggen">
               <span className="avatar__badge">
                 {(data?.user.display_name ?? 'G').charAt(0).toUpperCase()}
               </span>

@@ -1,0 +1,40 @@
+# Caddy voor Ganz. Twee dingen: het scherm uitserveren en /api doorgeven aan de backend.
+#
+# Het certificaat komt van Tailscale (`tailscale cert <naam>`) en niet van Let's Encrypt:
+# Ganz staat niet op internet, dus er is geen server die een uitdaging kan beantwoorden.
+# Tailscale geeft voor een .ts.net-naam een geldig certificaat af dat elke browser vertrouwt.
+
+{$GANZ_HOSTNAME} {
+	tls /certs/ganz.crt /certs/ganz.key
+
+	# Het scherm is een gebouwde React-app: alle onbekende paden horen bij index.html,
+	# anders werkt een verversing op /skills niet.
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv/ganz
+		try_files {path} /index.html
+		file_server
+	}
+
+	# Headers die niets kosten en een hoop schelen. Geen HSTS-preload: dit is een naam
+	# binnen je eigen netwerk, daar hoort geen publieke lijst iets over te weten.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		# Het scherm laadt geen enkel script van buiten. Vastleggen dus: dan kan een
+		# gevonden lek in de app ook geen vreemd script binnenhalen dat je tokens meeneemt.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'"
+		-Server
+	}
+
+	log {
+		output file /data/ganz.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

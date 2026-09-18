@@ -259,6 +259,21 @@ async def test_het_token_uit_een_stem_werkt_als_gewone_aanmelding(
     assert antwoord.json()["id"] == owner.id
 
 
+async def test_een_stem_levert_geen_sessie_op(client: AsyncClient, owner: User, session) -> None:
+    """Een opname is zo gemaakt. Zou een stem een vernieuwingstoken opleveren, dan wordt een
+    geluidsfragment twee maanden toegang — en dat is precies wat je niet wilt."""
+    from sqlalchemy import select
+    from app.models.access import UserSession
+
+    await schrijf_in(client, owner.id, STEF)
+
+    body = (await laat_herkennen(client, STEF)).json()
+
+    assert body["access_token"]
+    assert "refresh_token" not in body
+    assert (await session.scalars(select(UserSession))).first() is None
+
+
 async def test_iemand_zonder_tier_wordt_herkend_maar_mag_niets(
     client: AsyncClient, owner: User, session
 ) -> None:

@@ -1,9 +1,17 @@
 /* Alle verkeer met de backend loopt hierlangs.
 
-   Het inlogtoken staat in localStorage; het bevestigingstoken bewust niet, want dat
-   is kort geldig en hoort niet op schijf te blijven staan na het sluiten. */
+   Twee tokens, met een verschillende taak. Het inlogtoken gaat mee bij elk verzoek en is
+   maar een kwartier geldig — raakt het weg, dan is de schade klein. Het vernieuwingstoken
+   blijft twee maanden geldig en wordt alleen gebruikt om een nieuw inlogtoken te halen; hij
+   hoort bij één apparaat en is op de server in te trekken.
+
+   Allebei in localStorage, want ze moeten een herstart overleven. Het bevestigingstoken
+   bewust niet: dat is vijf minuten geldig en hoort niet op schijf achter te blijven. */
+
+import type { Device } from './types'
 
 const TOKEN_KEY = 'ganz.token'
+const REFRESH_KEY = 'ganz.refresh'
 
 /** Waar de backend draait.
  *
@@ -57,6 +65,74 @@ export function setToken(token: string | null) {
   }
 }
 
+export function getRefreshToken(): string | null {
+  try {
+    return localStorage.getItem(REFRESH_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setRefreshToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(REFRESH_KEY, token)
+    else localStorage.removeItem(REFRESH_KEY)
+  } catch {
+    /* Privémodus: dan ben je na het sluiten van het tabblad weer uitgelogd. */
+  }
+}
+
+/** Zo heet dit apparaat in je lijst met apparaten. Een geheugensteuntje, verder niets. */
+function apparaatnaam(): string {
+  if (window.ganz?.platform) return `Ganz-app op ${window.ganz.platform}`
+  try {
+    if (window.matchMedia('(max-width: 768px)').matches) return 'Telefoon (browser)'
+  } catch {
+    /* matchMedia ontbreekt in een enkele omgeving; dan de algemene naam. */
+  }
+  return 'Browser'
+}
+
+/* Eén vernieuwing tegelijk. Vraagt het scherm tien panelen op en verlopen ze allemaal
+   tegelijk, dan zouden tien verzoeken tegelijk gaan vernieuwen — en negen daarvan komen
+   aan met een token dat net vervangen is. De server ziet dat als hergebruik en sluit de
+   sessie. Dus: wie merkt dat het moet, zet het in gang; de rest wacht op diezelfde belofte. */
+let bezigMetVernieuwen: Promise<boolean> | null = null
+
+async function haalNieuwToken(): Promise<boolean> {
+  const refresh = getRefreshToken()
+  if (!refresh) return false
+  try {
+    const response = await fetch(`${base}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ refresh_token: refresh }),
+    })
+    if (!response.ok) {
+      // De sessie is ingetrokken of verlopen. Alles weg, en terug naar het inlogscherm.
+      setToken(null)
+      setRefreshToken(null)
+      return false
+    }
+    const body = await response.json()
+    setToken(body.access_token)
+    setRefreshToken(body.refresh_token ?? null)
+    return true
+  } catch {
+    // Netwerk weg. Het token weggooien zou je uitloggen omdat de wifi hapert.
+    return false
+  }
+}
+
+function vernieuw(): Promise<boolean> {
+  if (!bezigMetVernieuwen) {
+    bezigMetVernieuwen = haalNieuwToken().finally(() => {
+      bezigMetVernieuwen = null
+    })
+  }
+  return bezigMetVernieuwen
+}
+
 export function setConfirmationToken(token: string | null) {
   confirmationToken = token
 }
@@ -90,7 +166,11 @@ interface Options {
   keepSession?: boolean
 }
 
-export async function api<T>(path: string, options: Options = {}): Promise<T> {
+export async function api<T>(
+  path: string,
+  options: Options = {},
+  alGeprobeerd = false,
+): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
@@ -105,7 +185,13 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   })
 
   if (response.status === 401 && !options.keepSession) {
+    // Eerst proberen te vernieuwen. Een inlogtoken van een kwartier verloopt nu eenmaal
+    // midden in het gebruik, en daar hoort de gebruiker niets van te merken.
+    if (!alGeprobeerd && (await vernieuw())) {
+      return api<T>(path, options, true)
+    }
     setToken(null)
+    setRefreshToken(null)
     throw new ApiError(401, 'Je sessie is verlopen. Log opnieuw in.')
   }
   if (!response.ok) {
@@ -123,12 +209,23 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
 }
 
 export async function login(email: string, password: string) {
-  const result = await api<{ access_token: string }>('/auth/login', {
+  const result = await api<{ access_token: string; refresh_token?: string }>('/auth/login', {
     method: 'POST',
-    body: { email, password },
+    body: { email, password, device_name: apparaatnaam() },
   })
   setToken(result.access_token)
+  setRefreshToken(result.refresh_token ?? null)
   return result
+}
+
+/** De apparaten die op dit moment toegang hebben. */
+export async function listSessions() {
+  return api<Device[]>('/auth/sessions')
+}
+
+/** Gooit één apparaat eruit. Is het dit apparaat, dan ben je meteen uitgelogd. */
+export async function revokeSession(id: number) {
+  return api<{ revoked: number; message: string }>(`/auth/sessions/${id}`, { method: 'DELETE' })
 }
 
 export async function confirmWithPassword(password: string) {
@@ -159,7 +256,15 @@ export async function setPin(password: string, pin: string) {
   await api('/auth/pin', { method: 'POST', body: { password, pin }, keepSession: true })
 }
 
-export function logout() {
+export async function logout() {
+  // Eerst de server, dan pas de tokens weggooien: anders blijft de sessie daar openstaan
+  // en zie je op je andere apparaten een telefoon in de lijst die allang is uitgelogd.
+  try {
+    await api('/auth/logout', { method: 'POST' })
+  } catch {
+    /* Lukt dat niet, dan is uitloggen op dít apparaat belangrijker dan netjes afmelden. */
+  }
   setToken(null)
+  setRefreshToken(null)
   setConfirmationToken(null)
 }

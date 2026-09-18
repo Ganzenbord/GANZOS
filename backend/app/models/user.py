@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UtcDateTime
 
 if TYPE_CHECKING:
+    from app.models.access import UserPermission
     from app.models.video import Video
     from app.models.voice import VoiceProfile
 
@@ -67,3 +68,16 @@ class User(Base, TimestampMixin):
         lazy="raise_on_sql",
         passive_deletes=True,
     )
+
+    # Deze wél altijd meeladen, anders dan de andere twee: bij elk verzoek moet Ganz weten
+    # wat je mag, en dat vergeten is niet "een query minder" maar "een recht te veel".
+    permission_overrides: Mapped[list["UserPermission"]] = relationship(
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        passive_deletes=True,
+    )
+
+    @property
+    def overrides(self) -> dict[str, bool]:
+        """De uitzonderingen op zijn tier, als `{recht: mag het}`."""
+        return {rij.permission_key: rij.granted for rij in self.permission_overrides}

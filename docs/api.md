@@ -75,11 +75,19 @@ handelingen: [voice.md](voice.md).
 
 | Methode | Pad | Wat het doet |
 | --- | --- | --- |
-| POST | `/auth/login` | e-mailadres + wachtwoord → token |
+| POST | `/auth/login` | e-mailadres + wachtwoord → inlogtoken + vernieuwingstoken |
+| POST | `/auth/refresh` | vernieuwingstoken → een nieuw stel; geen inlogcontrole nodig |
+| GET | `/auth/sessions` | welke apparaten nu toegang hebben (zonder tokens) |
+| DELETE | `/auth/sessions/{id}` | één apparaat uitloggen |
+| POST | `/auth/logout` | dit apparaat uitloggen, of met `?alles=true` allemaal |
 | POST | `/auth/confirm` | wachtwoord óf pincode → kortlopend bevestigingstoken |
 | POST | `/auth/pin` | pincode instellen of wijzigen (je huidige wachtwoord is nodig) |
 | GET | `/auth/me` | wie ben ik, wat mag ik, en of ik een pincode heb (`has_pin`) |
 | GET | `/auth/permissions` | het hele rechtenregister, met per recht of jij het hebt |
+
+Een inlogtoken is vijftien minuten geldig; het vernieuwingstoken zestig dagen, en de klok
+begint bij elk gebruik opnieuw. Het scherm vernieuwt zelf zodra een verzoek 401 antwoordt, dus
+daar merk je niets van. Zie [server.md](server.md).
 
 Gevoelige handelingen vragen naast het inlogtoken ook een bevestigingstoken in de
 header `X-Ganz-Confirmation`. Ontbreekt die, dan antwoordt de API met **428** en de

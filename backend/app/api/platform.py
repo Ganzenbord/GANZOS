@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.api.deps import require_permission
-from app.core.permissions import tier_allows
+from app.core.permissions import allows
 from app.models.platform import (
     Conversation,
     Integration,
@@ -45,7 +45,7 @@ async def system(user: User = Depends(require_permission("system.read"))):
     nog draait en verder niets. Anders zou de tier-1-eis op /system/metrics niets
     voorstellen.
     """
-    return snapshot(detailed=tier_allows(user.tier, "system.admin"))
+    return snapshot(detailed=allows(user.tier, "system.admin", user.overrides))
 
 
 @router.get("/llm")

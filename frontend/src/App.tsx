@@ -11,6 +11,7 @@ import { ChannelsPage } from './pages/ChannelsPage'
 import { ModulePage } from './pages/ModulePage'
 import { SkillsPage } from './pages/SkillsPage'
 import { TasksPage } from './pages/TasksPage'
+import { DevicesCard } from './components/panels/DevicesCard'
 import { PinCard } from './components/panels/PinCard'
 import { YouTubeCard } from './components/panels/YouTubeCard'
 import { Panel } from './components/ui/Panel'
@@ -256,7 +257,12 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
               <ModulePage
                 title="Instellingen — rechten"
                 endpoint="/auth/permissions"
-                intro={<PinCard />}
+                intro={
+                  <>
+                    <PinCard />
+                    <DevicesCard />
+                  </>
+                }
                 columns={[
                   { key: 'key', label: 'Recht' },
                   { key: 'granted', label: 'Jij mag dit' },

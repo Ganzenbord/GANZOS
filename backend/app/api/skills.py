@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import consume_confirmation, require_permission
 from app.core.config import Settings, get_settings
 from app.core.database import get_session
-from app.core.permissions import tier_allows
+from app.core.permissions import allows
 from app.models.platform import MissionTask, Skill
 from app.models.user import User
 from app.schemas.skill import (
@@ -231,7 +231,7 @@ async def execute_task(
         skill = await session.get(Skill, taak.skill_id)
         if skill is not None:
             nodig = task_service.required_permission_for(skill, executor)
-            if nodig and not tier_allows(user.tier, nodig):
+            if nodig and not allows(user.tier, nodig, user.overrides):
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN,
                     f"Skill '{skill.name}' vraagt het recht '{nodig}', en dat heb je niet.",

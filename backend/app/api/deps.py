@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.permissions import get_permission, tier_allows
+from app.core.permissions import allows, effective_permissions, get_permission
 from app.services import confirmation_service
 from app.core.security import decode_token
 from app.models.user import User
@@ -35,6 +35,9 @@ async def get_current_user(
     # heeft het nodig: een bevestiging die op een zwakke stemherkenning leunt, telt niet.
     request.state.token_origin = payload.get("origin")
     request.state.token_confidence = payload.get("confidence")
+    # Bij welke sessie dit token hoort, zodat "log dit apparaat uit" weet welk apparaat dat
+    # is. Een token uit een stemherkenning heeft er geen: die levert geen sessie op.
+    request.state.session_id = payload.get("sid")
     return user
 
 
@@ -48,12 +51,16 @@ def require_permission(key: str) -> Callable[..., Awaitable[User]]:
     permission = get_permission(key)
 
     async def dependency(user: User = Depends(get_current_user)) -> User:
-        if user.tier is None:
+        uitzonderingen = user.overrides
+        # "Geen tier en ook geen toegekende rechten" is iets anders dan "dit ene ding mag
+        # je niet", en verdient een andere zin: de eerste betekent dat er nog niets voor je
+        # is ingesteld.
+        if not effective_permissions(user.tier, uitzonderingen):
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
                 "Je bent bekend, maar hebt geen toegang tot Ganz.",
             )
-        if not tier_allows(user.tier, permission.key):
+        if not allows(user.tier, permission.key, uitzonderingen):
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
                 f"Hiervoor heb je tier {permission.max_tier} of hoger nodig "
@@ -70,6 +77,11 @@ def require_tier(min_tier: int) -> Callable[..., Awaitable[User]]:
     Let op de richting: een lager nummer is méér toegang, dus `min_tier` is de zwakste tier
     die nog naar binnen mag. Heeft wat je afschermt een naam, gebruik dan
     `require_permission()` — dan staat het in het register en zie je het terug in /auth/me.
+
+    Let ook op wat dit *niet* doet: het kijkt naar de tier en negeert de uitzonderingen per
+    persoon. Dat is met opzet — een uitzondering hangt aan een recht, en hier is er geen —
+    maar het maakt dit wel de botte bijl. Er is op dit moment geen endpoint dat hem nodig
+    heeft; komt die er, geef het dan liever een naam in het register.
     """
 
     async def dependency(user: User = Depends(get_current_user)) -> User:

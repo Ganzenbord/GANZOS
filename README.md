@@ -221,7 +221,8 @@ lijst met uitleg.
 | `GANZ_DATABASE_URL` | localhost | de databaseverbinding |
 | `GANZ_SECRET_KEY` | *ontwikkelwaarde* | ondertekent de inlogtokens |
 | `GANZ_ENCRYPTION_KEY` | *ontwikkelwaarde* | versleutelt de provider-tokens |
-| `GANZ_ACCESS_TOKEN_MINUTES` | `720` | hoe lang een sessie geldig is |
+| `GANZ_ACCESS_TOKEN_MINUTES` | `15` | hoe lang een inlogtoken geldig is |
+| `GANZ_REFRESH_TOKEN_DAYS` | `60` | hoe lang een apparaat ongebruikt mag liggen |
 | `GANZ_CONFIRMATION_TOKEN_MINUTES` | `5` | hoe kort een tweede bevestiging meegaat |
 | `GANZ_CONFIRMATION_MAX_FAILURES` | `5` | zoveel mispogingen en het slot gaat erop |
 | `GANZ_CONFIRMATION_LOCKOUT_MINUTES` | `15` | hoe lang dat slot erop blijft |
@@ -283,6 +284,7 @@ paneel met uitleg, geen voorbeeldbedrag.
 | [docs/database.md](docs/database.md) | de tabellen en waarom ze zo zijn |
 | [docs/api.md](docs/api.md) | alle eindpunten |
 | [docs/security.md](docs/security.md) | tiers, bevestiging, sleutels |
+| [docs/server.md](docs/server.md) | Ganz als server voor meerdere mensen: netwerk, sessies, rechten |
 | [docs/voice.md](docs/voice.md) | stemherkenning en wat een stem wel en niet opent |
 | [docs/skills.md](docs/skills.md) | skills, taken, matchen en uitvoeren |
 | [docs/youtube.md](docs/youtube.md) | koppelen met YouTube, en echt uploaden |

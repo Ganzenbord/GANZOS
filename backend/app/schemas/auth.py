@@ -1,17 +1,52 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1)
+    device_name: str | None = Field(
+        default=None,
+        max_length=120,
+        description="Hoe dit apparaat in je lijst komt te staan, bijvoorbeeld "
+        "'Telefoon van Stef'. Een geheugensteuntje, verder niets.",
+    )
 
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in_minutes: int
+    # Alleen bij inloggen met een wachtwoord. Een stemherkenning levert er geen: een opname
+    # mag nooit een sessie van twee maanden worden.
+    refresh_token: str | None = None
+    session_id: int | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class SessionOut(BaseModel):
+    """Eén ingelogd apparaat. Zonder tokens — die staan hier met opzet niet in."""
+
+    id: int
+    device_name: str | None
+    user_agent: str | None
+    ip_address: str | None
+    created_at: datetime
+    last_used_at: datetime | None
+    expires_at: datetime
+    # Of dit het apparaat is waar je nu op kijkt. Handig als je er vijf hebt.
+    current: bool = False
+
+
+class RevokeResponse(BaseModel):
+    revoked: int
+    message: str
 
 
 class SetPinRequest(BaseModel):

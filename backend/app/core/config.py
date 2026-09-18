@@ -38,7 +38,14 @@ class Settings(BaseSettings):
 
     # Ondertekent de inlogtokens.
     secret_key: str = DEV_SECRET_KEY
-    access_token_minutes: int = 60 * 12
+    # Kort, want een inlogtoken staat nergens en is dus niet in te trekken. Wat het draaiend
+    # houdt is het vernieuwingstoken hieronder; dat staat wél in de database en kan per
+    # apparaat worden doorgestreept.
+    access_token_minutes: int = 15
+    # Hoe lang een apparaat ingelogd blijft zonder je wachtwoord opnieuw te vragen. De klok
+    # begint opnieuw bij elk gebruik, dus dit is "hoe lang mag een apparaat ongebruikt
+    # liggen", niet "hoe vaak moet ik inloggen".
+    refresh_token_days: int = 60
     # Een tweede bevestiging is kort geldig: hij dekt één gevoelige handeling af.
     confirmation_token_minutes: int = 5
     # Mispogingen tellen over álle bevestigingen samen, niet per poging apart. Elke poging

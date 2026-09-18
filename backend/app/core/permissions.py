@@ -13,6 +13,7 @@ voordat hij wordt uitgevoerd.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from app.models.user import TIER_GUEST, TIER_LIMITED, TIER_OWNER, TIER_TRUSTED
@@ -80,7 +81,38 @@ def tier_allows(tier: int | None, key: str) -> bool:
 
 
 def permissions_for_tier(tier: int | None) -> list[str]:
-    """Wat deze tier mag. De frontend verbergt hiermee wat toch niet werkt."""
+    """Wat deze tier mag, zónder de uitzonderingen per persoon."""
     if tier is None:
         return []
     return [perm.key for perm in PERMISSIONS if tier <= perm.max_tier]
+
+
+def allows(tier: int | None, key: str, overrides: Mapping[str, bool] | None = None) -> bool:
+    """Mag deze persoon dit?
+
+    De tier bepaalt de grondlijn, een uitzondering per persoon gaat daaroverheen — in
+    allebei de richtingen. Zonder die uitzonderingen zou "mag alleen de lampen, de mail en
+    het weer" niet te maken zijn: een tier is een rechte lijn, en zo iemand moet een greep
+    eruit hebben. En andersom: iemand die verder alles mag maar dit ene ding niet.
+
+    Let op wat `tier is None` nu betekent: geen rechten uit een tier. Heeft zo iemand ook
+    geen uitzonderingen, dan mag hij nog steeds niets — precies zoals eerst.
+    """
+    if overrides:
+        uitzondering = overrides.get(key)
+        if uitzondering is not None:
+            # Een recht dat niet bestaat is geen recht, ook niet als iemand het toekent.
+            get_permission(key)
+            return uitzondering
+    return tier_allows(tier, key)
+
+
+def effective_permissions(
+    tier: int | None, overrides: Mapping[str, bool] | None = None
+) -> list[str]:
+    """Alles wat deze persoon werkelijk mag. De frontend verbergt hiermee wat toch niet werkt.
+
+    Dit is wat `/auth/me` teruggeeft, en het is het enige antwoord dat klopt: kijken naar
+    alleen de tier laat de uitzonderingen weg.
+    """
+    return [perm.key for perm in PERMISSIONS if allows(tier, perm.key, overrides)]

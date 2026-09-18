@@ -12,7 +12,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.core.permissions import PERMISSIONS, get_permission, permissions_for_tier, tier_allows
-from app.core.security import create_token
+from app.core.security import create_token, hash_password
 from app.models.confirmation import MAX_ATTEMPTS, ConfirmationRequest, ConfirmationStatus
 from app.models.user import TIER_GUEST, TIER_LIMITED, TIER_OWNER, TIER_TRUSTED, User
 from app.utils.pin import InvalidPinError, validate_pin
@@ -475,3 +475,90 @@ def test_de_ontwikkelsleutel_is_een_geldige_fernet_sleutel() -> None:
     from app.core.config import DEV_ENCRYPTION_KEY
 
     Fernet(DEV_ENCRYPTION_KEY.encode())
+
+
+# --- Rechten die van de tier afwijken ----------------------------------------
+
+
+async def test_een_beperkte_gebruiker_krijgt_precies_de_rechten_die_hij_kreeg(
+    client: AsyncClient, session
+) -> None:
+    """De reden dat deze tabel bestaat.
+
+    "Mag alleen de lampen, de mail en het weer" is geen stuk van de tierlijn. Zou je zo
+    iemand tier 3 geven om bij één ding te kunnen, dan ziet hij meteen ook het uploadschema,
+    de skills en de systeemmonitor."""
+    from app.models.access import UserPermission
+
+    buurman = User(
+        email="buurman@example.com",
+        display_name="Buurman",
+        password_hash=hash_password(WACHTWOORD),
+        tier=None,
+    )
+    session.add(buurman)
+    await session.flush()
+    session.add(UserPermission(user_id=buurman.id, permission_key="todo.read", granted=True))
+    await session.commit()
+
+    body = (await client.get("/auth/me", headers=auth_headers(buurman))).json()
+
+    assert body["permissions"] == ["todo.read"]
+    assert body["tier"] is None
+    # En het werkt ook echt, niet alleen in de lijst.
+    assert (await client.get("/todos", headers=auth_headers(buurman))).status_code == 200
+    assert (await client.get("/finance/overview", headers=auth_headers(buurman))).status_code == 403
+
+
+async def test_een_ingetrokken_recht_gaat_boven_de_tier(
+    client: AsyncClient, owner: User, session
+) -> None:
+    from app.models.access import UserPermission
+
+    assert (await client.get("/finance/overview", headers=auth_headers(owner))).status_code == 200
+
+    session.add(
+        UserPermission(
+            user_id=owner.id,
+            permission_key="finance.read",
+            granted=False,
+            note="Even niet, tijdens de verbouwing",
+        )
+    )
+    await session.commit()
+
+    assert (await client.get("/finance/overview", headers=auth_headers(owner))).status_code == 403
+    body = (await client.get("/auth/me", headers=auth_headers(owner))).json()
+    assert "finance.read" not in body["permissions"]
+
+
+async def test_het_rechtenoverzicht_laat_zien_wat_een_uitzondering_is(
+    client: AsyncClient, owner: User, session
+) -> None:
+    """Een uitzondering die je niet ziet, is een uitzondering die niemand nakijkt."""
+    from app.models.access import UserPermission
+
+    session.add(
+        UserPermission(user_id=owner.id, permission_key="finance.read", granted=False)
+    )
+    await session.commit()
+
+    rijen = (await client.get("/auth/permissions", headers=auth_headers(owner))).json()
+    per_naam = {rij["key"]: rij for rij in rijen}
+
+    assert per_naam["finance.read"]["granted"] is False
+    assert per_naam["finance.read"]["override"] is False
+    # Een recht zonder uitzondering zegt dat ook, in plaats van te zwijgen.
+    assert per_naam["todo.read"]["override"] is None
+
+
+async def test_zonder_tier_en_zonder_rechten_blijft_alles_dicht(
+    client: AsyncClient, owner: User, session
+) -> None:
+    owner.tier = None
+    await session.commit()
+
+    antwoord = await client.get("/todos", headers=auth_headers(owner))
+
+    assert antwoord.status_code == 403
+    assert "geen toegang" in antwoord.json()["detail"]

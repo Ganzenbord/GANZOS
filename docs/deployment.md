@@ -3,6 +3,10 @@
 Ganz bestaat uit drie delen die los van elkaar starten: een backend, een scherm, en een
 desktopschil die dat scherm in een venster zet. Ze weten van elkaar via één adres.
 
+> Dit document gaat over draaien op je eigen computer, om aan Ganz te werken. Wil je hem op
+> één machine zetten waar jij en je broer van buitenaf bij kunnen — met Tailscale, Caddy en
+> Docker — lees dan [server.md](server.md).
+
 ## De backend
 
 ```bash
