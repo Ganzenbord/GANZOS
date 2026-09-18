@@ -109,6 +109,19 @@ Eén valkuil zit daarin vast: een platliggende PostgreSQL komt **niet** als nett
 `SQLAlchemyError` binnen maar als kale `ConnectionRefusedError` uit asyncpg. Vangen op
 `SQLAlchemyError` alleen is dus niet genoeg. `tests/test_health.py` houdt dat vast.
 
+## Stubs met een echt koppelvlak
+
+Twee onderdelen doen nog niet wat ze straks moeten doen, maar zijn wel al zo gebouwd dat de
+echte versie erin past zonder dat de rest verandert:
+
+- **`SpeakerEncoder`** — SpeechBrain, of straks pyannote, of in de tests een namaakversie.
+- **`ToolRegistry` / `SkillExecutor`** — de stappen van een skill worden nagelopen en gelogd,
+  maar er gebeurt nog niets in de buitenwereld. Een echt gereedschap aansluiten is één
+  `register()` erbij; de Task-API verandert er niet van. Zie [skills.md](skills.md).
+
+Dat `simulated: true` staat in elk antwoord. Een stub die zich voordoet als het echte werk is
+erger dan geen stub.
+
 ## Een nieuwe partij toevoegen
 
 Een bank, exchange of platform erbij betekent: één klasse schrijven die voldoet aan

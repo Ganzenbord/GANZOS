@@ -81,6 +81,17 @@ class Settings(BaseSettings):
     # niemand ooit kunnen beginnen. Zet dit op false zodra iedereen erin staat.
     voice_enrollment_open_when_empty: bool = True
 
+    # --- Skills -------------------------------------------------------------
+    # Het model dat opdrachten en skills op betekenis vergelijkt. Draait lokaal; er gaat
+    # nooit iets naar een externe dienst om te matchen.
+    skill_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    skill_model_cache_dir: str | None = None
+
+    # Vanaf hoeveel gelijkenis een skill bij een opdracht hoort. Te laag en Ganz pakt de
+    # verkeerde skill; te hoog en hij zegt steeds dat hij het niet kan. Deze waarde geldt
+    # voor beide manieren van matchen, en die tellen niet hetzelfde — zie docs/skills.md.
+    skill_match_threshold: float = 0.45
+
     # Seed-data is uitsluitend voor development; zie scripts/seed.py.
     allow_seed_data: bool = False
 

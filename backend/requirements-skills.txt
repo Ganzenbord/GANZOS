@@ -1,0 +1,7 @@
+# Skills matchen op betekenis in plaats van op woorden. Apart, want sentence-transformers
+# brengt torch mee — ruim een gigabyte. Zonder deze stap werkt matchen gewoon, maar dan op
+# gedeelde woorden; dat staat ook in elk antwoord vermeld.
+#
+#   pip install -r requirements-skills.txt
+sentence-transformers==3.3.1
+torch==2.5.1

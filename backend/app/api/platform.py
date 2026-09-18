@@ -49,26 +49,10 @@ async def llm(
     return await core_service.llm_status(session)
 
 
-@router.get("/skills")
-async def skills(
-    user: User = Depends(require_permission("skills.read")),
-    session: AsyncSession = Depends(get_session),
-):
-    result = await session.execute(
-        select(Skill).where(Skill.user_id == user.id).order_by(Skill.name)
-    )
-    return [
-        {
-            "id": row.id,
-            "name": row.name,
-            "description": row.description,
-            "category": row.category,
-            "enabled": row.enabled,
-            "run_count": row.run_count,
-            "last_used_at": row.last_used_at,
-        }
-        for row in result.scalars().all()
-    ]
+# GET /skills stond hier ook. Dat botste met app/api/skills.py, dat hetzelfde pad bedient
+# maar met de volledige skill erbij (stappen, versie, hoe vaak het lukte). FastAPI koos de
+# eerste van de twee, dus de rijkere versie was onbereikbaar — zonder dat iets dat zei.
+# Er is er nu nog één, in app/api/skills.py. De velden die hier stonden zitten daar ook in.
 
 
 @router.get("/missions")

@@ -12,10 +12,11 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
-    JSON,
     Boolean,
+    Float,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     func,
@@ -26,6 +27,13 @@ from app.models.base import Base, TimestampMixin, UtcDateTime, utcnow
 
 
 class Skill(Base, TimestampMixin):
+    """Iets dat Ganz kan, vastgelegd zodat het herhaald kan worden.
+
+    Een skill is een naam, een omschrijving waarop gematcht wordt, en een rijtje stappen.
+    De stappen staan als JSON omdat hun vorm nog beweegt; wat vastligt (wie het mag, hoe
+    vaak het lukte) staat in gewone kolommen.
+    """
+
     __tablename__ = "skills"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -39,13 +47,53 @@ class Skill(Base, TimestampMixin):
     run_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
+    # Waar deze skill op aanslaat. Losse woorden of korte zinnen, met | ertussen:
+    # "video uploaden|zet de video online". Leeg betekent: alleen op naam en omschrijving.
+    trigger_pattern: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # De stappen, bijvoorbeeld [{"tool": "youtube.upload", "action": "upload"}].
+    # Wat een stap precies mag, staat in app/services/skill_executor.py.
+    steps: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+
+    # Het recht dat nodig is om deze skill te draaien. Leeg = geen extra eis bovenop
+    # `tasks.execute`. Staat als sleutel in het register, niet als los if-je hier.
+    required_permission: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+    success_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failure_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Gaat omhoog bij elke wijziging van de stappen, zodat je in het logboek kunt zien
+    # wélke versie er draaide toen iets misging.
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
 
 class MissionStatus(StrEnum):
+    """De toestanden die een taak kan hebben.
+
+    De namen komen uit de bestaande Command Center-tijdlijn en staan al in de frontend.
+    Ze dekken wat de architectuurprompt vraagt; alleen de woorden verschillen:
+
+    | prompt               | hier      |
+    | -------------------- | --------- |
+    | pending              | planned   |
+    | matching             | matching  |
+    | executing            | running   |
+    | completed            | done      |
+    | waiting_confirmation | waiting   |
+    | failed               | failed    |
+    | cancelled            | cancelled |
+    """
+
     PLANNED = "planned"
+    MATCHING = "matching"
     RUNNING = "running"
     DONE = "done"
     WAITING = "waiting"
     FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+# Een taak die hierin staat is klaar: er gebeurt niets meer mee.
+FINAL_STATUSES = frozenset({MissionStatus.DONE, MissionStatus.FAILED, MissionStatus.CANCELLED})
 
 
 class MissionTask(Base, TimestampMixin):
@@ -67,8 +115,22 @@ class MissionTask(Base, TimestampMixin):
     scheduled_for: Mapped[datetime | None] = mapped_column(
         UtcDateTime, index=True, nullable=True
     )
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     source: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+    # Welke skill hem uitvoerde. Verdwijnt de skill, dan blijft de taak staan: wat gedaan is,
+    # is gedaan.
+    skill_id: Mapped[int | None] = mapped_column(
+        ForeignKey("skills.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    # Waarom die skill gekozen is, of waarom geen enkele. Altijd invullen: zonder uitleg is
+    # een verkeerde match niet na te trekken.
+    match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    match_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class MemoryEntry(Base, TimestampMixin):

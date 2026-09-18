@@ -31,7 +31,11 @@ PERMISSIONS: tuple[Permission, ...] = (
     Permission("system.read", "Systeemmonitor bekijken", TIER_LIMITED),
     Permission("activity.read", "Activiteitenlog bekijken", TIER_TRUSTED),
     Permission("skills.read", "Skills bekijken", TIER_LIMITED),
+    Permission("skills.write", "Skills maken, wijzigen en verwijderen", TIER_TRUSTED),
     Permission("tasks.read", "Missies en taken bekijken", TIER_LIMITED),
+    Permission("tasks.write", "Taken aanmaken en annuleren", TIER_TRUSTED),
+    # Uitvoeren is iets anders dan aanmaken: hier gaat Ganz echt iets doen.
+    Permission("tasks.execute", "Een taak laten uitvoeren", TIER_TRUSTED),
     Permission("memory.read", "Geheugen bekijken", TIER_TRUSTED),
     Permission("conversations.read", "Gesprekken bekijken", TIER_TRUSTED),
     Permission("workflows.read", "Workflows bekijken", TIER_TRUSTED),

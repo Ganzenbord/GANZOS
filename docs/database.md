@@ -25,8 +25,8 @@ migratie tegen een andere database draaien, dan kan dat met `-x db_url=...`.
 | --- | --- |
 | `users` | e-mailadres, naam, wachtwoordhash, tier |
 | `activity_log_entries` | wat er is gebeurd (nooit waarmee) |
-| `skills` | wat Ganz kan |
-| `mission_tasks` | wat Ganz zelf uitvoert |
+| `skills` | wat Ganz kan: waar hij op aanslaat, welke stappen, hoe vaak het lukte |
+| `mission_tasks` | wat Ganz zelf uitvoert, met de gekozen skill en waarom |
 | `memory_entries` | wat Ganz onthoudt |
 | `conversations`, `conversation_messages` | gesprekken |
 | `integrations` | gekoppelde diensten, met versleutelde tokens |

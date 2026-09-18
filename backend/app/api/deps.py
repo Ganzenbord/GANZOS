@@ -88,6 +88,54 @@ def require_tier(min_tier: int) -> Callable[..., Awaitable[User]]:
     return dependency
 
 
+async def consume_confirmation(
+    request: Request,
+    *,
+    user: User,
+    session: AsyncSession,
+    permission_key: str,
+    required: bool,
+) -> bool:
+    """Neem een meegestuurde bevestiging op, als die er is.
+
+    Anders dan `require_confirmation` hangt dit niet aan een recht dat vooraf als gevoelig
+    bekendstaat. Bij het uitvoeren van een skill blijkt pas uit de stappen of er iets
+    gevoeligs bij zit — één skill haalt het weer op, de volgende publiceert een video.
+
+    Geeft True als er bevestigd is, False als er niets is meegestuurd en het ook niet hoefde.
+    Is er wél iets meegestuurd maar deugt het niet, dan is dat altijd een fout: stilzwijgend
+    doorgaan zou betekenen dat een ongeldige bevestiging hetzelfde oplevert als geen.
+    """
+    kop = request.headers.get("X-Ganz-Confirmation")
+    if not kop:
+        if required:
+            raise HTTPException(
+                status.HTTP_428_PRECONDITION_REQUIRED,
+                "Deze skill doet iets onomkeerbaars. Bevestig eerst met je wachtwoord of "
+                "pincode (POST /auth/confirm).",
+            )
+        return False
+
+    payload = decode_token(kop, "confirmation")
+    if payload is None or int(payload["sub"]) != user.id or "cr" not in payload:
+        raise HTTPException(
+            status.HTTP_428_PRECONDITION_REQUIRED, "De bevestiging is ongeldig of verlopen."
+        )
+    try:
+        await confirmation_service.consume(
+            session,
+            verzoek_id=int(payload["cr"]),
+            user_id=user.id,
+            permission_key=permission_key,
+        )
+    except confirmation_service.ConfirmationError as exc:
+        await session.commit()
+        raise HTTPException(exc.status_code, exc.message) from exc
+
+    request.state.confirmed = True
+    return True
+
+
 def require_confirmation(key: str) -> Callable[..., Awaitable[User]]:
     """Als het recht gevoelig is, moet er ook een geldige bevestiging mee.
 

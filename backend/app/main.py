@@ -15,16 +15,34 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, dashboard, finance, health, platform, social, todos, uploads, voice
+from app.api import (
+    auth,
+    dashboard,
+    finance,
+    health,
+    platform,
+    skills,
+    social,
+    todos,
+    uploads,
+    voice,
+)
 from app.core.config import Settings, get_settings
 from app.core.database import Database, create_database
 from app.integrations.voice import SpeakerEncoder, SpeechBrainEncoder
+from app.services.skill_executor import SkillExecutor
+from app.services.skill_matcher import (
+    EmbeddingMatcher,
+    FallbackMatcher,
+    LexicalMatcher,
+    SkillMatcher,
+)
 from app.workers.scheduler import shutdown_scheduler, start_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ganz")
 
-API_MODULES = (auth, dashboard, platform, todos, finance, social, uploads, voice)
+API_MODULES = (auth, dashboard, platform, todos, finance, social, uploads, voice, skills)
 
 
 def create_app(
@@ -32,6 +50,8 @@ def create_app(
     settings: Settings | None = None,
     database: Database | None = None,
     speaker_encoder: SpeakerEncoder | None = None,
+    skill_matcher: SkillMatcher | None = None,
+    skill_executor: SkillExecutor | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     # Een meegegeven database is van de aanroeper; die ruimt hem zelf op.
@@ -45,6 +65,13 @@ def create_app(
         # anders duurt opstarten minuten voor iets wat misschien niet nodig is.
         app.state.speaker_encoder = speaker_encoder or SpeechBrainEncoder(
             model_name=settings.voice_model, cache_dir=settings.voice_model_cache_dir
+        )
+        app.state.skill_executor = skill_executor or SkillExecutor()
+        # Matchen op betekenis als het model er is, anders op woorden. Welke van de twee het
+        # werd staat in elke uitslag, dus je ziet het meteen.
+        app.state.skill_matcher = skill_matcher or FallbackMatcher(
+            EmbeddingMatcher(settings.skill_model, settings.skill_model_cache_dir),
+            LexicalMatcher(),
         )
         start_scheduler(app.state.database, settings=settings)
         logger.info("Ganz gestart in omgeving %s", settings.environment)

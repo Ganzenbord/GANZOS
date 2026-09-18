@@ -23,6 +23,8 @@ Piet ergens binnen te laten. Zo iemand krijgt wel een token, maar elk endpoint a
 | `activity.read`, `integrations.read` | 2 | |
 | `social.manage` | 2 | **ja** |
 | `voice.read` | 2 | |
+| `skills.write` | 2 | |
+| `tasks.write`, `tasks.execute` | 2 | zie hieronder |
 | `finance.read` | **1** | |
 | `finance.manage` | **1** | **ja** |
 | `upload.execute` | **1** | **ja** |
@@ -76,6 +78,14 @@ wachtwoorden (pbkdf2_sha256) en staat nooit leesbaar in de database.
 De pincode is bedoeld voor de telefoon en voor bediening met de stem, waar een heel wachtwoord
 intikken onhandig is. Hij vervángt het wachtwoord niet: je kunt hem alleen gebruiken als je al
 ingelogd of herkend bent.
+
+### Een uitzondering: bevestiging per stap, niet per endpoint
+
+`tasks.execute` staat niet als gevoelig in het register, en dat is geen slordigheid. Of er
+bevestigd moet worden hangt af van de skill: één haalt het weer op, de volgende publiceert
+een video. Het endpoint kijkt daarom naar de stappen en vraagt alleen een bevestiging als er
+gevoelig gereedschap bij zit. Dat loopt via dezelfde `confirmation_requests` als de rest —
+er is geen tweede, zwakkere weg. Zie [skills.md](skills.md).
 
 ### En een herkende stem?
 

@@ -150,6 +150,29 @@ Werkt het niet zoals je wilt:
 
 ---
 
+## Skills (optioneel: matchen op betekenis)
+
+Ganz matcht een opdracht op een skill door woorden te vergelijken. Dat werkt meteen en heeft
+niets nodig. Wil je dat hij ook begrijpt dat "zet de video online" en "upload naar YouTube"
+hetzelfde bedoelen, installeer dan het taalmodel — ook dat draait lokaal:
+
+```bash
+cd backend
+pip install -r requirements-skills.txt
+```
+
+In elk antwoord staat welke van de twee gebruikt is (`"backend": "woorden"` of
+`"betekenis"`), dus je ziet meteen of het aanstaat.
+
+> **Let op:** de twee tellen niet hetzelfde. Zet je het model aan, kijk dan opnieuw naar
+> `GANZ_SKILL_MATCH_THRESHOLD`. Zie [docs/skills.md](docs/skills.md).
+
+De stappen van een skill worden op dit moment **nagelopen en gelogd, maar niet echt
+uitgevoerd** — dat staat ook in elk antwoord (`"simulated": true`). Het koppelvlak eronder is
+wel al af, dus een echte YouTube-upload aansluiten is later één regel.
+
+---
+
 ## Instellingen
 
 Alles via omgevingsvariabelen in `backend/.env`. Zie `.env.example` voor de volledige
@@ -218,6 +241,7 @@ paneel met uitleg, geen voorbeeldbedrag.
 | [docs/api.md](docs/api.md) | alle eindpunten |
 | [docs/security.md](docs/security.md) | tiers, bevestiging, sleutels |
 | [docs/voice.md](docs/voice.md) | stemherkenning en wat een stem wel en niet opent |
+| [docs/skills.md](docs/skills.md) | skills, taken, matchen en uitvoeren |
 | [docs/todos.md](docs/todos.md) | de dagelijkse takenlijst |
 | [docs/finance.md](docs/finance.md) | vermogen, valuta, providers |
 | [docs/social.md](docs/social.md) | gecombineerde kanaalstatistieken |

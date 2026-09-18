@@ -16,6 +16,22 @@ Antwoordt de database niet, dan komt er een `503` met `"status": "degraded"`,
 Alles staat onder `/api`. Inloggen gaat met een bearer-token in de
 `Authorization`-header.
 
+## Skills en taken
+
+| Endpoint | Wat het doet | Recht |
+| --- | --- | --- |
+| `GET /api/skills` · `POST` · `PATCH /{id}` · `DELETE /{id}` | skills beheren | `skills.read` / `skills.write` |
+| `GET /api/skills/tools` | waar een skill uit kan bestaan | `skills.read` |
+| `GET /api/tasks` · `POST` | taken bekijken en aanmaken | `tasks.read` / `tasks.write` |
+| `POST /api/tasks/{id}/match` | zoek de skill die erbij hoort | `tasks.write` |
+| `POST /api/tasks/{id}/execute` | uitvoeren | `tasks.execute` |
+| `POST /api/tasks/{id}/cancel` | afbreken | `tasks.write` |
+
+`match` geeft altijd een reden terug, ook als er niets past. `execute` vraagt om een
+bevestiging zodra er gevoelig gereedschap in de stappen zit, en antwoordt met
+`"simulated": true` zolang de gereedschappen nog niets in de buitenwereld doen. Zie
+[skills.md](skills.md).
+
 ## Stem
 
 | Endpoint | Wat het doet | Nodig |
