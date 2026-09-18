@@ -99,8 +99,13 @@ npm run app:build:linux    # Linux (AppImage en deb)
 
 Het resultaat komt in `dist/` (de electron-builder-map, niet `frontend/dist`).
 
-Het pictogram komt uit `build/icon.png`. Eén bestand van 1024 × 1024; electron-builder maakt
-daar zelf een `.icns` (macOS) en een `.ico` (Windows) van.
+Het pictogram komt uit `assets/icon.png`. Eén bestand van 1024 × 1024; electron-builder
+maakt daar zelf een `.icns` (macOS) en een `.ico` (Windows) van.
+
+De map heet `assets` en niet `build`, wat bij electron-builder gebruikelijker is: `build/`
+staat in `.gitignore` (daar zet Node zijn bouwsel neer), en dan zou het pictogram bij het
+klonen ontbreken zonder dat je het merkt — tot de app met het standaardpictogram van
+Electron verschijnt.
 
 ### Op welke computer bouw je wat
 

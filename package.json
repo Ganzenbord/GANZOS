@@ -47,7 +47,7 @@
       "category": "Utility"
     },
     "directories": {
-      "buildResources": "build"
+      "buildResources": "assets"
     }
   }
 }
