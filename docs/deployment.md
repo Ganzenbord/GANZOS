@@ -99,15 +99,46 @@ npm run app:build:linux    # Linux (AppImage en deb)
 
 Het resultaat komt in `dist/` (de electron-builder-map, niet `frontend/dist`).
 
-**Bouw voor Windows op Windows en voor macOS op een Mac.** Dat is geen aanbeveling maar
-praktijk: `npm run app:build:win` op Linux maakt wel een werkende `Ganz.exe`, maar loopt
-daarna vast op het ondertekenen (`wine is required`), en `--mac` heeft de gereedschappen van
-macOS zelf nodig. Op het systeem waar je voor bouwt is `npm run app:build` genoeg.
+Het pictogram komt uit `build/icon.png`. Eén bestand van 1024 × 1024; electron-builder maakt
+daar zelf een `.icns` (macOS) en een `.ico` (Windows) van.
+
+### Op welke computer bouw je wat
+
+**Bouw voor Windows op Windows en voor macOS op een Mac** — dan is `npm run app:build`
+genoeg en klopt alles. Moet het toch vanaf een andere computer, dan is dit wat wel en niet
+kan; het is uitgeprobeerd, niet gegokt:
+
+| Wat je wilt | Vanaf Linux | Hoe |
+| --- | --- | --- |
+| Windows, als map in een zip | **lukt** | `npx electron-builder --win zip -c.win.signAndEditExecutable=false` |
+| Windows, als installer (nsis) | lukt niet | vraagt om **wine, inclusief de 32-bits helft**; zonder dat strandt het op het maken van de uninstaller |
+| macOS, als app in een zip | **lukt** | `npx electron-builder --mac zip -c.mac.identity=null` |
+| macOS, als dmg | lukt niet | vraagt om de gereedschappen van macOS zelf |
+
+Die `signAndEditExecutable=false` slaat de stap over die het pictogram en het versienummer
+ín `Ganz.exe` zet — dat gereedschap is 32-bits Windows. De app werkt gewoon, maar draag je
+hem zo over, dan staat er het standaardpictogram van Electron op. Bouw je op Windows, laat
+die schakelaar dan weg.
+
+Een zip is voor eigen gebruik prima: uitpakken en `Ganz.exe` (of `Ganz.app`) starten. Er is
+dan alleen geen snelkoppeling in het startmenu.
 
 Deze builds zijn **niet ondertekend**. Zonder certificaat waarschuwt macOS (Gatekeeper) en
 Windows (SmartScreen) bij het openen dat de maker onbekend is. Voor eigen gebruik kun je dat
 toestaan; wil je het breder verspreiden, dan is code-signing de volgende stap — en dat kost
 geld per jaar.
+
+Wat je in de praktijk tegenkomt:
+
+- **Windows** zegt "Windows heeft uw pc beveiligd". Klik op *Meer informatie* en dan op
+  *Toch uitvoeren*.
+- **macOS** zegt bij een app die je gedownload hebt dat hij "beschadigd is en naar de
+  prullenmand moet". Hij is niet beschadigd; hij is niet ondertekend. Klik hem met de
+  rechtermuisknop aan en kies *Open*, of haal het downloadmerkje eraf:
+
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/Ganz.app
+  ```
 
 ## De schil nalopen zonder venster
 
