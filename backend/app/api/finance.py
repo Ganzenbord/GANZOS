@@ -13,6 +13,7 @@ from app.core.database import get_session
 from app.api.deps import require_confirmation, require_permission
 from app.integrations.finance.registry import describe_finance_providers
 from app.models.user import User
+from app.schemas.platform import ChannelHistoryOut, ProviderOut
 from app.schemas.finance import (
     FinanceHistoryPoint,
     FinanceOverviewOut,
@@ -38,7 +39,7 @@ async def overview(
     return await finance_service.overview(session, user.id)
 
 
-@router.get("/providers")
+@router.get("/providers", response_model=list[ProviderOut])
 async def providers(user: User = Depends(read_access)):
     return describe_finance_providers()
 

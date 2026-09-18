@@ -14,10 +14,13 @@ from app.api.deps import get_current_user
 from app.models.activity import ActivityAction
 from app.models.user import User
 from app.core.permissions import PERMISSIONS, allows, effective_permissions
+from app.schemas.platform import PermissionOut
 from app.schemas.auth import (
     ConfirmationResponse,
     ConfirmRequest,
     LoginRequest,
+    ChangePasswordRequest,
+    ChangePasswordResponse,
     RefreshRequest,
     RevokeResponse,
     SessionOut,
@@ -289,6 +292,48 @@ async def set_pin(
     return SetPinResponse(message="Pincode ingesteld.")
 
 
+@router.post("/password", response_model=ChangePasswordResponse)
+async def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Wijzig je eigen wachtwoord, vanaf welk apparaat dan ook.
+
+    Twee dingen die hier bij elkaar horen:
+
+    - **Je huidige wachtwoord is nodig**, ook al ben je al ingelogd. Anders is een
+      openstaande laptop genoeg om je account over te nemen.
+    - **Alle andere apparaten worden uitgelogd.** Dat is precies waarom je je wachtwoord
+      wijzigt als je vermoedt dat iemand meekijkt — en zonder deze regel doet het wijzigen
+      niets aan de sessies die al open staan. Dit apparaat blijft ingelogd; anders zou je
+      jezelf eruit gooien op het moment dat je het probleem aan het oplossen bent.
+    """
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Je huidige wachtwoord klopt niet")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(422, "Het nieuwe wachtwoord is hetzelfde als het oude.")
+
+    user.password_hash = hash_password(payload.new_password)
+    huidige = getattr(request.state, "session_id", None)
+    aantal = await session_service.revoke_all(session, user_id=user.id, behalve=huidige)
+    await log_activity(
+        session,
+        action=ActivityAction.USER_PASSWORD_CHANGED,
+        user_id=user.id,
+        message=f"Wachtwoord gewijzigd; {aantal} ander(e) apparaat(en) uitgelogd.",
+    )
+    await session.commit()
+    return ChangePasswordResponse(
+        message=(
+            "Je wachtwoord is gewijzigd."
+            + (f" {aantal} ander(e) apparaat(en) moeten opnieuw inloggen." if aantal else "")
+        ),
+        revoked_sessions=aantal,
+    )
+
+
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)):
     return UserOut(
@@ -301,7 +346,7 @@ async def me(user: User = Depends(get_current_user)):
     )
 
 
-@router.get("/permissions")
+@router.get("/permissions", response_model=list[PermissionOut])
 async def permission_registry(user: User = Depends(get_current_user)):
     """Het hele register, met per recht of deze gebruiker het heeft."""
     return [

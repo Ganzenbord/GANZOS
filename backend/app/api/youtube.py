@@ -12,6 +12,7 @@ from app.api.deps import require_confirmation, require_permission
 from app.core.config import Settings, get_settings
 from app.core.database import get_session
 from app.models.user import User
+from app.schemas.platform import DisconnectOut
 from app.schemas.youtube import YouTubeConnectOut, YouTubeStatusOut
 from app.services import youtube_service
 
@@ -94,7 +95,7 @@ async def oauth_callback(
     )
 
 
-@router.post("/disconnect")
+@router.post("/disconnect", response_model=DisconnectOut)
 async def disconnect(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(require_confirmation("integrations.manage")),
@@ -102,12 +103,12 @@ async def disconnect(
     """Maakt de koppeling los. De gemeten cijfers blijven staan."""
     losgemaakt = await youtube_service.disconnect(session, user.id)
     await session.commit()
-    return {
-        "disconnected": losgemaakt,
-        "message": (
+    return DisconnectOut(
+        disconnected=losgemaakt,
+        message=(
             "De koppeling is losgemaakt." if losgemaakt else "Er was niets om los te maken."
         ),
-    }
+    )
 
 
 def _pagina(titel: str, tekst: str, *, ok: bool) -> HTMLResponse:

@@ -58,6 +58,23 @@ class SetPinResponse(BaseModel):
     message: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, description="Je huidige wachtwoord")
+    new_password: str = Field(
+        min_length=12,
+        max_length=200,
+        description="Minstens twaalf tekens. Lengte doet meer dan hoofdletters en "
+        "leestekens: die maken een wachtwoord vooral moeilijk te onthouden.",
+    )
+
+
+class ChangePasswordResponse(BaseModel):
+    message: str
+    # Hoeveel andere apparaten eruit zijn gegooid. Wie zijn wachtwoord wijzigt omdat hij
+    # bang is dat iemand meekijkt, wil dat getal zien.
+    revoked_sessions: int
+
+
 class ConfirmRequest(BaseModel):
     """Tweede bevestiging voor gevoelige handelingen.
 

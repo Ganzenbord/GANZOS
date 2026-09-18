@@ -22,6 +22,13 @@ from app.models.platform import (
     Workflow,
 )
 from app.models.user import User
+from app.schemas.dashboard import CoreOut, LlmStatusOut, MemoryInsightsOut, MissionOut, SystemOut
+from app.schemas.platform import (
+    ConversationOut,
+    IntegrationOut,
+    TimeOut,
+    WorkflowOut,
+)
 from app.services import core_service
 from app.services.activity_service import recent_activity
 from app.services.system_service import snapshot
@@ -29,7 +36,7 @@ from app.services.system_service import snapshot
 router = APIRouter(tags=["ganz"])
 
 
-@router.get("/core")
+@router.get("/core", response_model=CoreOut)
 async def core(
     user: User = Depends(require_permission("core.read")),
     session: AsyncSession = Depends(get_session),
@@ -37,7 +44,10 @@ async def core(
     return await core_service.core_overview(session, user.id)
 
 
-@router.get("/system")
+# exclude_none: voor tier 3 horen de cijfers er niet te zíjn, niet "er te zijn met de
+# waarde null". Dat scheelt een scherm dat "CPU: null" laat zien, en het houdt de belofte
+# hard — een veld dat ontbreekt kan niemand per ongeluk tonen.
+@router.get("/system", response_model=SystemOut, response_model_exclude_none=True)
 async def system(user: User = Depends(require_permission("system.read"))):
     """Het stoplicht voor het dashboard.
 
@@ -48,7 +58,7 @@ async def system(user: User = Depends(require_permission("system.read"))):
     return snapshot(detailed=allows(user.tier, "system.admin", user.overrides))
 
 
-@router.get("/llm")
+@router.get("/llm", response_model=list[LlmStatusOut])
 async def llm(
     user: User = Depends(require_permission("core.read")),
     session: AsyncSession = Depends(get_session),
@@ -62,7 +72,7 @@ async def llm(
 # Er is er nu nog één, in app/api/skills.py. De velden die hier stonden zitten daar ook in.
 
 
-@router.get("/missions")
+@router.get("/missions", response_model=list[MissionOut])
 async def missions(
     user: User = Depends(require_permission("tasks.read")),
     session: AsyncSession = Depends(get_session),
@@ -86,7 +96,7 @@ async def missions(
     ]
 
 
-@router.get("/memory")
+@router.get("/memory", response_model=MemoryInsightsOut)
 async def memory(
     limit: int = Query(default=50, ge=1, le=500),
     user: User = Depends(require_permission("memory.read")),
@@ -112,7 +122,7 @@ async def memory(
     return {"insights": await core_service.memory_insights(session, user.id), "entries": entries}
 
 
-@router.get("/conversations")
+@router.get("/conversations", response_model=list[ConversationOut])
 async def conversations(
     user: User = Depends(require_permission("conversations.read")),
     session: AsyncSession = Depends(get_session),
@@ -133,7 +143,7 @@ async def conversations(
     ]
 
 
-@router.get("/integrations")
+@router.get("/integrations", response_model=list[IntegrationOut])
 async def integrations(
     user: User = Depends(require_permission("integrations.read")),
     session: AsyncSession = Depends(get_session),
@@ -151,12 +161,15 @@ async def integrations(
             "status": row.status,
             "status_detail": row.status_detail,
             "last_checked_at": row.last_checked_at,
+            # Alleen óf er gegevens zijn ingevuld. Wát erin staat komt hier niet langs, en
+            # het model hierboven heeft er ook geen veld voor.
+            "has_credentials": row.credentials_encrypted is not None,
         }
         for row in result.scalars().all()
     ]
 
 
-@router.get("/workflows")
+@router.get("/workflows", response_model=list[WorkflowOut])
 async def workflows(
     user: User = Depends(require_permission("workflows.read")),
     session: AsyncSession = Depends(get_session),

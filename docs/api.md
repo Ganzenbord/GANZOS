@@ -80,6 +80,7 @@ handelingen: [voice.md](voice.md).
 | GET | `/auth/sessions` | welke apparaten nu toegang hebben (zonder tokens) |
 | DELETE | `/auth/sessions/{id}` | één apparaat uitloggen |
 | POST | `/auth/logout` | dit apparaat uitloggen, of met `?alles=true` allemaal |
+| POST | `/auth/password` | je eigen wachtwoord wijzigen; logt je andere apparaten uit |
 | POST | `/auth/confirm` | wachtwoord óf pincode → kortlopend bevestigingstoken |
 | POST | `/auth/pin` | pincode instellen of wijzigen (je huidige wachtwoord is nodig) |
 | GET | `/auth/me` | wie ben ik, wat mag ik, en of ik een pincode heb (`has_pin`) |
@@ -106,6 +107,18 @@ Koppelen en losmaken zijn gevoelige handelingen: ze vragen een bevestigingstoken
 terugkeerpagina juist niet — die wordt door Google aangeroepen en heeft dus geen
 inlogtoken; wat daarvoor in de plaats komt is een ondertekende `state`. Zie
 [youtube.md](youtube.md).
+
+## Gekoppelde diensten
+
+| Methode | Pad | Wat het doet |
+| --- | --- | --- |
+| GET | `/integrations` | wat er gekoppeld is, en óf er een sleutel staat |
+| POST | `/integrations` | een dienst koppelen met je eigen sleutel |
+| PATCH | `/integrations/{id}` | wijzigen; zonder `credentials` blijft de sleutel staan |
+| DELETE | `/integrations/{id}` | loskoppelen |
+
+Er is geen eindpunt dat een sleutel teruggeeft. Dat is geen omissie: wat erin gaat, komt er
+niet meer uit richting een client. Zie [security.md](security.md).
 
 ## Dashboard
 

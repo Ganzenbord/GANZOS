@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import logo from '../../assets/logo.png'
 import type { Dashboard } from '../../api/types'
 import { clockTime, longDate } from '../../lib/format'
 import { useServerNow, useServerOffset } from '../../hooks/useServerClock'
@@ -109,7 +110,7 @@ export function Shell({ data, children }: { data: Dashboard | null; children: Re
       <aside className="sidebar">
         <div className="sidebar__brand">
           <span className="sidebar__mark">
-            <IconCore size={18} />
+            <img src={logo} alt="" width={34} height={34} />
           </span>
           <span>
             <span className="sidebar__name">GANZ</span>
@@ -144,6 +145,9 @@ export function Shell({ data, children }: { data: Dashboard | null; children: Re
 
       <div className="main">
         <header className="topbar">
+          <span className="topbar__mark">
+            <img src={logo} alt="Ganz" width={30} height={30} />
+          </span>
           <span className="pill">
             <StatusDot tone={toneFor(data?.core.core_status)} />
             Core — {data?.core.core_status === 'active' ? 'Actief' : 'Verbinden…'}

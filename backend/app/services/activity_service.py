@@ -7,37 +7,19 @@ gekoppeld, niet hoeveel er op staat.
 
 from __future__ import annotations
 
-import re
 from typing import Any, Sequence
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.activity import ActivityAction, ActivityLogEntry
+from app.utils.redact import REDACTED, scrub
 
-# Alles wat hierop lijkt wordt vervangen door "[verwijderd]".
-_FORBIDDEN_KEY = re.compile(
-    r"(token|secret|password|passwd|pin|api[_-]?key|credential|client[_-]?secret"
-    r"|refresh|access[_-]?token|iban|bsn|account[_-]?number|balance|saldo"
-    r"|value|amount|revenue|total|vermogen)",
-    re.IGNORECASE,
-)
-REDACTED = "[verwijderd]"
-MAX_DEPTH = 4
+# Het patroon stond hier, maar gold daarmee alleen voor het logboek. Nu staat het in
+# app/utils/redact.py, zodat de logging en de foutafhandeling dezelfde regel volgen.
+scrub_context = scrub
 
-
-def scrub_context(value: Any, depth: int = 0) -> Any:
-    """Haalt gevoelige velden uit een willekeurige structuur."""
-    if depth > MAX_DEPTH:
-        return REDACTED
-    if isinstance(value, dict):
-        return {
-            key: (REDACTED if _FORBIDDEN_KEY.search(str(key)) else scrub_context(item, depth + 1))
-            for key, item in value.items()
-        }
-    if isinstance(value, (list, tuple)):
-        return [scrub_context(item, depth + 1) for item in value]
-    return value
+__all__ = ["ActivityAction", "REDACTED", "log_activity", "scrub_context"]
 
 
 async def log_activity(

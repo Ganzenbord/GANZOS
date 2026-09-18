@@ -11,6 +11,7 @@ from app.core.database import get_session
 from app.api.deps import require_permission
 from app.models.base import utcnow
 from app.models.user import User
+from app.schemas.platform import TimeOut
 from app.schemas.dashboard import DashboardOut
 from app.services.dashboard_service import build_dashboard
 
@@ -26,7 +27,7 @@ async def dashboard(
     return await build_dashboard(session, user, day)
 
 
-@router.get("/time")
+@router.get("/time", response_model=TimeOut)
 async def server_time():
     """De servertijd, voor de aftelling. Vrij toegankelijk: het verraadt niets."""
-    return {"server_time": utcnow()}
+    return TimeOut(server_time=utcnow(), timezone="UTC")

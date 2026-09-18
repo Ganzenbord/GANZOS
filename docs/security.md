@@ -141,6 +141,72 @@ Drie dingen die hier anders liggen dan bij de rest van de API, en waarom:
 
 Zie [youtube.md](youtube.md) voor het hele verhaal.
 
+## Wat er naar de client gaat, en wat nooit
+
+Eén regel: **elk eindpunt heeft een responsemodel met een opgesomde lijst velden.** Geen
+databaserij die rechtstreeks wordt geserialiseerd, geen `**model.dict()`. Het verschil is
+niet vandaag maar over een half jaar: komt er een kolom bij met een sleutel erin, dan lekt
+hij niet mee, want hij staat niet in de lijst.
+
+Dat is geen afspraak maar een test. `tests/test_sanitization.py` laat de applicatie zichzelf
+nalopen en faalt zodra:
+
+- een eindpunt geen responsemodel heeft (op een korte lijst uitzonderingen na, elk met een
+  reden erbij: eindpunten die 204 teruggeven hebben geen inhoud om te lekken);
+- een uitzondering in die lijst nergens meer op slaat — anders verbergt een dode regel de
+  volgende;
+- er ergens in `app/api/` een ruwe serialisatie staat;
+- een model dat de client krijgt een veld heeft dat naar een geheim ruikt (`token`,
+  `secret`, `credential`, `api_key`, `_hash`, `embedding`). Drie velden zijn uitgezonderd,
+  want dáár is het token de bedoeling: het inlogtoken, het vernieuwingstoken en het
+  bevestigingstoken.
+
+Daarnaast controleert dezelfde test het echte antwoord: een kanaal met een echte sleutel
+erin, en dan kijken of die sleutel voorkomt in `/social/channels`, `/social/overview`,
+`/dashboard` of `/integrations`.
+
+### Logboeken en foutmeldingen
+
+Dezelfde regel, andere weg naar buiten. Een stack trace in een logbestand of een foutmelding
+naar het scherm kan net zo goed een token bevatten.
+
+- **Een onverwachte fout geeft de client een kenmerk, verder niets.** Geen stack trace, geen
+  klassenaam, geen padnamen. Het kenmerk (acht tekens) staat ook in het logboek, zodat je
+  precies díé fout kunt opzoeken zonder dat het kenmerk zelf iets verraadt.
+- **Elke logregel gaat langs een filter** (`app/utils/redact.py`) dat weghaalt wat eruitziet
+  als een geheim: JWT's, Google-API-sleutels, client-secrets, en een databaseverbinding met
+  een wachtwoord erin. Het filter hangt aan de *handlers* en niet aan de loggers, want een
+  filter op een logger laat alles door wat van sqlalchemy of uvicorn doorheen komt.
+- **Het activiteitenlog schoont zijn context** met hetzelfde patroon. Eén plek die bepaalt
+  wat gevoelig is, zodat een nieuw soort geheim één regel kost.
+
+Wat dit níét kan: een geheim dat er niet uitziet als een geheim glipt erdoor. Het filter is
+de tweede verdedigingslinie; de eerste is niet loggen.
+
+## Eigen sleutels toevoegen
+
+Een gebruiker kan zijn eigen sleutels in Ganz zetten — bij **Instellingen → Gekoppelde
+diensten**, vanaf welk apparaat dan ook. Ze gaan versleuteld de database in (Fernet).
+
+Er is met opzet **geen eindpunt dat ze teruggeeft**. Je kunt een sleutel invullen, vervangen
+en weggooien, maar niet uitlezen; ook niet als jij hem er zelf in hebt gezet. Wat het scherm
+wel zegt is óf er een sleutel staat (`has_credentials`), nooit welke. Alleen de backend haalt
+ze op, via `integration_service.credentials_for()`, om er iets mee te doen.
+
+Een gevolg daarvan: de client kan bij een wijziging de oude sleutel niet meesturen, want hij
+heeft hem nooit gezien. Daarom laat een `PATCH` zonder `credentials` de bestaande sleutel
+staan, en wist alleen een leeg object hem.
+
+## Je eigen wachtwoord
+
+`POST /api/auth/password`, met je huidige wachtwoord erbij. Ingelogd zijn is niet genoeg —
+anders is een openstaande laptop een accountovername.
+
+Het wijzigen **logt al je andere apparaten uit**, dit apparaat niet. Dat is precies waarom je
+je wachtwoord wijzigt als je vermoedt dat iemand meekijkt; zonder die regel verandert er
+niets voor de sessies die al open staan. En het apparaat waarop je het doet blijft ingelogd,
+want anders gooi je jezelf eruit op het moment dat je het probleem aan het oplossen bent.
+
 ## Sleutels en tokens
 
 - Tokens van banken, exchanges en platforms staan **versleuteld** in de database

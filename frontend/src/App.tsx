@@ -12,6 +12,8 @@ import { ModulePage } from './pages/ModulePage'
 import { SkillsPage } from './pages/SkillsPage'
 import { TasksPage } from './pages/TasksPage'
 import { DevicesCard } from './components/panels/DevicesCard'
+import { IntegrationsCard } from './components/panels/IntegrationsCard'
+import { PasswordCard } from './components/panels/PasswordCard'
 import { PinCard } from './components/panels/PinCard'
 import { YouTubeCard } from './components/panels/YouTubeCard'
 import { Panel } from './components/ui/Panel'
@@ -259,8 +261,10 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
                 endpoint="/auth/permissions"
                 intro={
                   <>
+                    <PasswordCard />
                     <PinCard />
                     <DevicesCard />
+                    {can('integrations.read') ? <IntegrationsCard /> : null}
                   </>
                 }
                 columns={[

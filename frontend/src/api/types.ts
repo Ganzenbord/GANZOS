@@ -211,6 +211,8 @@ export interface Integration {
   status: string
   status_detail: string | null
   last_checked_at: string | null
+  /** Óf er een sleutel is ingevuld. Nooit welke — die komt niet van de server af. */
+  has_credentials: boolean
 }
 
 

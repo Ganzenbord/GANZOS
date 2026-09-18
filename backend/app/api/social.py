@@ -9,6 +9,7 @@ from app.core.database import get_session
 from app.api.deps import require_confirmation, require_permission
 from app.integrations.social.registry import describe_social_providers
 from app.models.user import User
+from app.schemas.platform import ChannelHistoryOut, ProviderOut
 from app.schemas.social import (
     SocialChannelIn,
     SocialChannelOut,
@@ -34,7 +35,7 @@ async def overview(
     return await social_service.overview(session, user.id)
 
 
-@router.get("/providers")
+@router.get("/providers", response_model=list[ProviderOut])
 async def providers(user: User = Depends(read_access)):
     return describe_social_providers()
 
@@ -113,7 +114,7 @@ async def sync_now(
     return await social_service.overview(session, user.id)
 
 
-@router.get("/history")
+@router.get("/history", response_model=list[ChannelHistoryOut])
 async def history(
     days: int = Query(default=90, ge=1, le=1825),
     user: User = Depends(read_access),

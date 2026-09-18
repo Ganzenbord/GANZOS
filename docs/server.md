@@ -351,6 +351,7 @@ Op volgorde van hoe erg het is, niet van hoe waarschijnlijk.
 | **Een gestolen vernieuwingstoken** | 60 dagen geldig, en een JWT kun je niet terughalen. | Het token staat als afdruk in de database, is per apparaat in te trekken, en wordt bij elk gebruik vervangen. Komt een oud token terug, dan gaat de hele sessie dicht. |
 | **Een gestolen telefoon** | Ingelogd, en misschien met de pincode in het hoofd van de dief. | **Instellingen → Apparaten** laat elk ingelogd apparaat zien en gooit hem er met één knop uit. Daarna werkt zelfs een token dat hij al had niet meer. Doe dat vóór het wachtwoord wijzigen — dat laatste doet namelijk niets met bestaande sessies. |
 | **Een back-up die uitlekt** | Daar staat je hele database in, inclusief de versleutelde tokens. | De tokens zijn versleuteld met een sleutel die je apart bewaart. Bewaar je hem ernaast, dan is deze mitigatie er niet. |
+| **Een sleutel die via een API-antwoord naar buiten glipt** | Ganz heeft sleutels van je kanalen en van betaalde diensten. Eén veld te veel in een antwoord en ze staan in de netwerkinspecteur van elke browser. | Elk eindpunt heeft een responsemodel met een opgesomde lijst velden, en een test die faalt zodra er een eindpunt zonder zo'n model bij komt. Zie [security.md](security.md). |
 | **Een lek in het scherm (XSS)** | De tokens staan in `localStorage`; een vreemd script in de pagina kan ze meenemen. | Het scherm laadt geen enkel script van buiten, en de Content-Security-Policy in de `Caddyfile` legt dat vast: `default-src 'self'`. Zonder die regel is dit het meest onderschatte risico van de hele opzet. |
 | **Een skill die een verkeerd bestand uploadt** | Een skill noemt een bestandsnaam, en Ganz mag publiceren. | Uploaden kan alleen uit één ingestelde map, en zonder die instelling helemaal niet. `..` en een symbolische link naar buiten worden geweigerd. De map is read-only aangekoppeld. |
 | **Doorproberen van de pincode** | Vier cijfers is tienduizend mogelijkheden — voor een computer geen werk. | Vijf mispogingen per gebruiker binnen een kwartier en het slot gaat erop, ook voor de juiste pincode. |
@@ -398,11 +399,14 @@ In deze volgorde. De eerste vier gaan over de machine; de rest staat al in de co
 9. **Stemmen inschrijven**, allebei, in een rustige kamer. Zie [voice.md](voice.md).
 10. **YouTube koppelen** met het adres van de tailnet als terugkeeradres. Zie
     [youtube.md](youtube.md).
-11. **Een back-up instellen.** Dagelijks `pg_dump` naar een andere machine, en de
+11. **Je eigen sleutels erin zetten** bij Instellingen → Gekoppelde diensten (Higgsfield,
+    en wat er verder bijkomt). Ze staan dan op de server en niet op de computer waar je
+    toevallig achter zit — dat is de hele reden dat je dit vanaf je telefoon kunt doen.
+12. **Een back-up instellen.** Dagelijks `pg_dump` naar een andere machine, en de
     encryptiesleutel op een derde plek. Dit staat er nog niet en het is het enige punt op
     deze lijst waar ik echt aan zou trekken: zonder back-up is één kapotte schijf het einde
     van alles wat Ganz weet.
-12. **Pas als er een derde gebruiker komt:** een tier van `NULL` en een paar rijen in
+13. **Pas als er een derde gebruiker komt:** een tier van `NULL` en een paar rijen in
     `user_permissions`. Er is nog geen scherm om die rijen te beheren — dat gaat nu met de
     hand in de database. Komt er een derde gebruiker aan, zeg het dan, dan bouw ik dat erbij.
 

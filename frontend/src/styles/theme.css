@@ -15,7 +15,17 @@
   --text-muted: #8496ab;
   --text-dim: #5b6d81;
 
-  --amber: #e9a63b;
+  /* --- Huisstijl -----------------------------------------------------------
+     De vier kleuren van het merk, met hun eigen naam. Ze staan hier apart van de
+     werkkleuren hieronder, zodat je kunt zien wat van het merk is en wat een keuze van dit
+     scherm is. `--amber` is nu lettergelijk de merkkleur; de achtergronden zijn bewust
+     dónkerder gehouden dan #12141A, want dit scherm staat vaak de hele dag aan. */
+  --merk-antraciet: #12141A;
+  --merk-amber: #E8A33D;
+  --merk-groen: #2F6F5E;
+  --merk-wit: #F5F1E8;
+
+  --amber: var(--merk-amber);
   --amber-dim: #b57f2c;
   --amber-soft: rgba(233, 166, 59, 0.12);
   --green: #3ecf8e;
@@ -77,6 +87,7 @@ input, select, textarea { font: inherit; }
   border-bottom: 1px solid var(--border);
 }
 
+/* Het logo in een amberen ring: de ring hoort bij dit scherm, de gans bij het merk. */
 .sidebar__mark {
   width: 34px; height: 34px;
   border-radius: 50%;
@@ -84,6 +95,30 @@ input, select, textarea { font: inherit; }
   display: grid; place-items: center;
   color: var(--amber);
   font-size: 15px;
+  overflow: hidden;
+  background: var(--merk-antraciet);
+  flex: 0 0 auto;
+}
+
+.sidebar__mark img,
+.topbar__mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* De badge is rond met doorzichtige hoeken; dit houdt hem netjes binnen de ring. */
+  object-fit: cover;
+}
+
+/* Op een telefoon is de zijbalk weg, en daarmee het logo. Dus komt hij hier terug — en
+   alleen daar, anders staat hij twee keer op het scherm. */
+.topbar__mark {
+  display: none;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid var(--amber);
+  overflow: hidden;
+  background: var(--merk-antraciet);
+  flex: 0 0 auto;
 }
 
 .sidebar__name { font-weight: 600; letter-spacing: 0.14em; font-size: 14px; }
@@ -547,6 +582,7 @@ input, select, textarea { font: inherit; }
   [data-panel='memory'] { order: 14; }
   .panel { margin-bottom: var(--gap); }
   .topbar { padding: 0 16px; gap: 10px; }
+  .topbar__mark { display: block; }
   .topbar__clock { display: none; }
   .bignum { font-size: 25px; }
 

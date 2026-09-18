@@ -215,3 +215,97 @@ async def test_opruimen_laat_verse_sessies_staan(session, owner: User) -> None:
     assert aantal == 1
     over = (await session.scalars(select(UserSession.id))).all()
     assert list(over) == [rij.id]
+
+
+# --- Je eigen wachtwoord wijzigen --------------------------------------------
+
+
+async def test_wachtwoord_wijzigen_gooit_de_andere_apparaten_eruit(
+    client: AsyncClient, owner: User
+) -> None:
+    """Dít is waarom je je wachtwoord wijzigt als je vermoedt dat iemand meekijkt.
+
+    Zonder deze regel verandert er niets voor de sessies die al open staan, en is het
+    wijzigen een gebaar zonder gevolg."""
+    telefoon = await inloggen(client, owner, "Telefoon")
+    laptop = await inloggen(client, owner, "Laptop")
+
+    antwoord = await client.post(
+        "/auth/password",
+        json={"current_password": WACHTWOORD, "new_password": "een-veel-langer-wachtwoord"},
+        headers={"Authorization": f"Bearer {laptop['access_token']}"},
+    )
+
+    assert antwoord.status_code == 200, antwoord.text
+    assert antwoord.json()["revoked_sessions"] == 1
+    # De telefoon is eruit...
+    assert (
+        await client.post("/auth/refresh", json={"refresh_token": telefoon["refresh_token"]})
+    ).status_code == 401
+    # ...en het apparaat waar je het op deed niet. Anders gooi je jezelf eruit terwijl je
+    # het probleem aan het oplossen bent.
+    assert (
+        await client.post("/auth/refresh", json={"refresh_token": laptop["refresh_token"]})
+    ).status_code == 200
+
+
+async def test_wachtwoord_wijzigen_vraagt_om_het_oude(client: AsyncClient, owner: User) -> None:
+    """Ingelogd zijn is niet genoeg: een openstaande laptop mag geen accountovername zijn."""
+    sessie = await inloggen(client, owner)
+
+    antwoord = await client.post(
+        "/auth/password",
+        json={"current_password": "fout", "new_password": "een-veel-langer-wachtwoord"},
+        headers={"Authorization": f"Bearer {sessie['access_token']}"},
+    )
+
+    assert antwoord.status_code == 401
+    assert "huidige wachtwoord" in antwoord.json()["detail"]
+
+
+async def test_een_te_kort_wachtwoord_wordt_geweigerd(client: AsyncClient, owner: User) -> None:
+    sessie = await inloggen(client, owner)
+
+    antwoord = await client.post(
+        "/auth/password",
+        json={"current_password": WACHTWOORD, "new_password": "kort"},
+        headers={"Authorization": f"Bearer {sessie['access_token']}"},
+    )
+
+    assert antwoord.status_code == 422
+
+
+async def test_het_nieuwe_wachtwoord_werkt_en_het_oude_niet_meer(
+    client: AsyncClient, owner: User
+) -> None:
+    sessie = await inloggen(client, owner)
+    nieuw = "een-veel-langer-wachtwoord"
+
+    await client.post(
+        "/auth/password",
+        json={"current_password": WACHTWOORD, "new_password": nieuw},
+        headers={"Authorization": f"Bearer {sessie['access_token']}"},
+    )
+
+    oud = await client.post("/auth/login", json={"email": owner.email, "password": WACHTWOORD})
+    assert oud.status_code == 401
+    goed = await client.post("/auth/login", json={"email": owner.email, "password": nieuw})
+    assert goed.status_code == 200
+
+
+async def test_het_wachtwoord_komt_nergens_in_het_logboek(
+    client: AsyncClient, owner: User, session
+) -> None:
+    from app.models.activity import ActivityLogEntry
+
+    sessie = await inloggen(client, owner)
+    await client.post(
+        "/auth/password",
+        json={"current_password": WACHTWOORD, "new_password": "een-heel-nieuw-wachtwoord"},
+        headers={"Authorization": f"Bearer {sessie['access_token']}"},
+    )
+
+    regels = (await session.scalars(select(ActivityLogEntry))).all()
+    tekst = " ".join(f"{r.message} {r.context}" for r in regels)
+    assert "een-heel-nieuw-wachtwoord" not in tekst
+    assert WACHTWOORD not in tekst
