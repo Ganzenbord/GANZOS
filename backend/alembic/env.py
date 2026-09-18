@@ -8,8 +8,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.config import get_settings
+from app.core.config import get_settings
 from app.models import Base  # noqa: F401 - importeert alle tabellen
+from app.models.base import UtcDateTime
 
 config = context.config
 if config.config_file_name is not None:
@@ -25,6 +26,19 @@ def _database_url() -> str:
     return override or get_settings().database_url
 
 
+def render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
+    """Schrijf eigen kolomtypes uit als gewoon SQLAlchemy.
+
+    `UtcDateTime` is alleen een vertaling aan de Python-kant; in de database is het een
+    doodgewone timestamp met tijdzone. Zonder dit zet autogenerate `app.models.base.UtcDateTime`
+    in de migratie, en struikelt die bij het draaien over een import die er niet staat —
+    een fout die je pas ziet als je de migratie echt uitvoert.
+    """
+    if type_ == "type" and isinstance(obj, UtcDateTime):
+        return "sa.DateTime(timezone=True)"
+    return False
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=_database_url(),
@@ -32,6 +46,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        render_item=render_item,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -39,7 +54,10 @@ def run_migrations_offline() -> None:
 
 def _do_run_migrations(connection) -> None:
     context.configure(
-        connection=connection, target_metadata=target_metadata, compare_type=True
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        render_item=render_item,
     )
     with context.begin_transaction():
         context.run_migrations()

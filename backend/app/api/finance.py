@@ -9,8 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
-from app.deps import require_confirmation, require_permission
+from app.core.database import get_session
+from app.api.deps import require_confirmation, require_permission
 from app.integrations.finance.registry import describe_finance_providers
 from app.models.user import User
 from app.schemas.finance import (

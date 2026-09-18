@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.base import utcnow
 from app.models.user import User
-from app.permissions import permissions_for_tier, tier_allows
+from app.core.permissions import permissions_for_tier, tier_allows
 from app.services import (
     core_service,
     finance_service,

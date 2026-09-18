@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
-from app.deps import require_permission
+from app.core.database import get_session
+from app.api.deps import require_permission
 from app.models.platform import (
     Conversation,
     Integration,

@@ -11,8 +11,8 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
-from app.deps import require_permission
+from app.core.database import get_session
+from app.api.deps import require_permission
 from app.models.activity import ActivityAction
 from app.models.user import User
 from app.schemas.todo import (

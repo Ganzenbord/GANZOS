@@ -7,8 +7,8 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
-from app.deps import require_permission
+from app.core.database import get_session
+from app.api.deps import require_permission
 from app.models.base import utcnow
 from app.models.user import User
 from app.schemas.dashboard import DashboardOut

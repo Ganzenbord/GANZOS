@@ -8,9 +8,9 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
-from app.permissions import get_permission, tier_allows
-from app.security import decode_token
+from app.core.database import get_session
+from app.core.permissions import get_permission, tier_allows
+from app.core.security import decode_token
 from app.models.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)

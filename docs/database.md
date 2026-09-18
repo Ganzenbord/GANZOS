@@ -32,6 +32,43 @@ migratie tegen een andere database draaien, dan kan dat met `-x db_url=...`.
 | `integrations` | gekoppelde diensten, met versleutelde tokens |
 | `workflows` | reeksen stappen |
 | `llm_provider_status` | laatst gemeten toestand van de taalmodellen |
+| `voice_profiles` | de vingerafdruk van een ingesproken stem |
+| `videos` | video's, van concept tot gepubliceerd |
+
+### Dezelfde tabel, een andere naam
+
+De architectuurprompt noemt een aantal tabellen die hier al bestaan onder een eigen naam.
+Ze zijn met opzet niet dubbel aangemaakt — twee tabellen voor hetzelfde is precies de
+tijdelijke architectuur die later weggegooid moet worden.
+
+| In de prompt | Hier |
+| --- | --- |
+| `Task` | `mission_tasks` |
+| `Message` | `conversation_messages` |
+| `ChannelAccount` | `social_channels` |
+| `Memory` | `memory_entries` |
+| `ChannelStats` | `social_channel_stats` |
+| `Permission` | geen tabel: het register in `app/core/permissions.py` |
+
+Nog niet gebouwd, en waar ze horen als ze nodig zijn:
+
+| Nog te maken | Waarvoor, en wanneer |
+| --- | --- |
+| `AuthSession` | een lopende aanmelding vasthouden in plaats van alleen een JWT; nodig zodra een sessie ingetrokken moet kunnen worden |
+| `ConfirmationRequest` | de tweede bevestiging als tabel in plaats van een kortlevend token; nodig zodra een bevestiging aan één specifieke handeling moet hangen |
+| `ScheduledTask` | geplande taken in het algemeen; nu is er alleen `upload_schedules`, dat over uploads gaat |
+
+## Tijdstippen
+
+Alles wordt opgeslagen als UTC met tijdzone, en komt er ook zo weer uit — op elke
+database. Dat laatste gaat niet vanzelf: PostgreSQL bewaart de tijdzone, SQLite (de
+tests) niet. Zonder ingrijpen krijg je op SQLite een kale datetime terug, en klapt een
+vergelijking eruit met "can't compare offset-naive and offset-aware datetimes" — en dan
+alleen in de tests, of juist alleen op de echte database.
+
+`UtcDateTime` in `app/models/base.py` vangt dat af. Aan de tabellen verandert het niets;
+het is puur de vertaling aan de Python-kant. Gebruik dat type voor elke nieuwe
+datumkolom, niet `DateTime(timezone=True)` rechtstreeks.
 
 ### To do
 

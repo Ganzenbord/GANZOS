@@ -12,7 +12,7 @@ from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from app.config import get_settings
+from app.core.config import get_settings
 
 
 class TokenVault:

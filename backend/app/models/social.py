@@ -14,7 +14,6 @@ from enum import StrEnum
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    DateTime,
     ForeignKey,
     Integer,
     Numeric,
@@ -24,7 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, utcnow
+from app.models.base import Base, TimestampMixin, UtcDateTime, utcnow
 
 
 class SocialPlatform(StrEnum):
@@ -57,7 +56,7 @@ class SocialChannel(Base, TimestampMixin):
         String(32), default=ChannelStatus.NOT_CONFIGURED, nullable=False
     )
     status_detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     credentials_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     stats: Mapped[list["SocialChannelStats"]] = relationship(
@@ -85,7 +84,7 @@ class SocialChannelStats(Base):
     revenue: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
     revenue_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
     measured_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), index=True
+        UtcDateTime, default=utcnow, server_default=func.now(), index=True
     )
 
     channel: Mapped[SocialChannel] = relationship(back_populates="stats")

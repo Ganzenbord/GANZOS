@@ -24,7 +24,7 @@ een recht als je tier kleiner of gelijk is aan het maximum van dat recht.
 Finance is tier 1. Een upload daadwerkelijk uitvoeren ook: dat zet iets in gang naar
 buiten toe.
 
-Het register staat in `backend/app/permissions.py` — één lijst, zodat je in één oogopslag
+Het register staat in `backend/app/core/permissions.py` — één lijst, zodat je in één oogopslag
 ziet wie wat mag.
 
 ## Tweede bevestiging

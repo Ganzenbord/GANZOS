@@ -10,10 +10,10 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin, UtcDateTime
 from app.models.social import SocialChannel
 
 
@@ -60,7 +60,7 @@ class UploadSchedule(Base, TimestampMixin):
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     content_type: Mapped[str] = mapped_column(String(16), default=ContentType.VIDEO, nullable=False)
     scheduled_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), index=True, nullable=False
+        UtcDateTime, index=True, nullable=False
     )
     status: Mapped[str] = mapped_column(String(32), default=UploadStatus.SCHEDULED, nullable=False)
     status_detail: Mapped[str | None] = mapped_column(Text, nullable=True)

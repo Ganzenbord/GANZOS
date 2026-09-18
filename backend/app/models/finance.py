@@ -19,7 +19,6 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Boolean,
-    DateTime,
     ForeignKey,
     Integer,
     Numeric,
@@ -29,7 +28,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin, utcnow
+from app.models.base import Base, TimestampMixin, UtcDateTime, utcnow
 
 
 class AccountType(StrEnum):
@@ -72,7 +71,7 @@ class FinancialAccount(Base, TimestampMixin):
     current_value_eur: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
     fx_rate: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
 
-    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     status: Mapped[str] = mapped_column(
         String(32), default=AccountStatus.NOT_CONFIGURED, nullable=False
     )
@@ -97,5 +96,5 @@ class FinanceSnapshot(Base):
     total_eur: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     breakdown: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     captured_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), index=True
+        UtcDateTime, default=utcnow, server_default=func.now(), index=True
     )

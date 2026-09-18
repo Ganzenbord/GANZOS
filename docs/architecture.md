@@ -51,16 +51,18 @@ enkele aanroep.
 ```
 backend/
   app/
+    main.py         create_app(): bouwt de applicatie
+    api/            de eindpunten, plus deps.py (wie ben je, en mag je dit)
+    core/           instellingen, database, beveiliging, rechten
     models/         de tabellen
     schemas/        wat er in en uit de API gaat
     services/       de regels
-    routers/        de eindpunten
     integrations/   de buitenwereld
       base.py       de koppelvlakken waar iedereen zich aan houdt
       finance/      handmatig, crypto-koersen, register
       social/       YouTube, Instagram, TikTok, register
       fx.py         wisselkoersen naar euro
-    scheduler/      de achtergrondtaken
+    workers/        de achtergrondtaken
     utils/          geld, tijd, versleuteling
   alembic/          de migraties
   tests/            de testsuite
@@ -75,6 +77,36 @@ frontend/
 electron/           de desktopschil
 docs/               deze documentatie
 ```
+
+## De applicatie wordt gemaakt door een functie
+
+`create_app()` bouwt hem. Wie hem aanroept bepaalt welke instellingen en welke database
+erin gaan; een test geeft zijn eigen database mee en hoeft niets te vervangen wat er al
+staat. De regel `app = create_app()` onderaan `main.py` is er voor `uvicorn app.main:app`
+en legt zelf nog geen verbinding aan — dat gebeurt pas bij het opstarten (de lifespan).
+
+### Geen verbinding in een modulevariabele
+
+Eerder stonden `engine` en `SessionLocal` los in `core/database.py`. Dat werkt, maar dan
+deelt het hele programma één verbinding die al bij het importeren wordt aangelegd: een
+test kan er niet omheen, twee apps naast elkaar zitten elkaar in de weg, en bij het
+afsluiten blijft er van alles openstaan.
+
+Nu is er een `Database`-object. De lifespan zet er één klaar in `app.state`, endpoints
+vragen erom via `Depends(get_session)`, en wie geen verzoek heeft — de scheduler, de
+scripts — krijgt hem meegegeven of maakt zijn eigen met `create_database()`.
+
+## /health zegt pas 'ok' als de database antwoordt
+
+Vroeger gaf `/health` altijd `{"status": "ok"}`, ook met een database die plat lag. Dan
+meldt de monitor dat alles goed gaat terwijl niets werkt. Nu doet het endpoint een
+`SELECT 1` over de sessie die het binnenkrijgt, en geeft het een `503` met
+`status: degraded` als dat niet lukt — geen `500`, want dat is de uitkomst van de
+controle en niet een fout in de app.
+
+Eén valkuil zit daarin vast: een platliggende PostgreSQL komt **niet** als nette
+`SQLAlchemyError` binnen maar als kale `ConnectionRefusedError` uit asyncpg. Vangen op
+`SQLAlchemyError` alleen is dus niet genoeg. `tests/test_health.py` houdt dat vast.
 
 ## Een nieuwe partij toevoegen
 

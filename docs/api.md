@@ -1,5 +1,18 @@
 # API
 
+## /health — buiten het API-voorvoegsel
+
+`GET /health` (dus niet `/api/health`) zegt of de app én de database het doen. Een monitor
+moet hem op een vaste plek kunnen vinden, ook als het voorvoegsel verandert.
+
+```json
+{ "status": "ok", "environment": "production", "database": "ok", "detail": null }
+```
+
+Antwoordt de database niet, dan komt er een `503` met `"status": "degraded"`,
+`"database": "unavailable"` en een zin in `detail` die zegt wat eraan te doen is. Geen
+`500`: dat de database plat ligt is de uitkomst van de controle, geen fout in de app.
+
 Alles staat onder `/api`. Inloggen gaat met een bearer-token in de
 `Authorization`-header.
 

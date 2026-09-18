@@ -17,8 +17,8 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.config import get_settings
-from app.database import SessionLocal
+from app.core.config import get_settings
+from app.core.database import create_database
 from app.models.finance import AccountStatus, AccountType, FinancialAccount
 from app.models.platform import Integration, IntegrationStatus, MemoryEntry, Skill
 from app.models.social import ChannelStatus, SocialChannel, SocialChannelStats
@@ -38,7 +38,8 @@ async def seed(email: str) -> None:
         )
 
     now = datetime.now(timezone.utc)
-    async with SessionLocal() as session:
+    database = create_database()
+    async with database.session() as session:
         user = await session.scalar(select(User).where(User.email == email.lower()))
         if user is None:
             raise SystemExit(f"Geen gebruiker met {email}. Maak er eerst een met create_user.")

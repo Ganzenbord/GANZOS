@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from app.config import DEV_ENCRYPTION_KEY, DEV_SECRET_KEY, Settings
-from app.permissions import PERMISSIONS, permissions_for_tier, tier_allows
-from app.security import create_token, decode_token
+from app.core.config import DEV_ENCRYPTION_KEY, DEV_SECRET_KEY, Settings
+from app.core.permissions import PERMISSIONS, permissions_for_tier, tier_allows
+from app.core.security import create_token, decode_token
 from app.services.activity_service import scrub_context
 from app.utils.crypto import TokenVault
 from tests.conftest import auth_headers

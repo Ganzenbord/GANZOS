@@ -1,7 +1,7 @@
 """Alle tabellen op één plek, zodat Alembic ze allemaal ziet."""
 
 from app.models.activity import ActivityAction, ActivityLogEntry
-from app.models.base import Base, TimestampMixin, utcnow
+from app.models.base import Base, TimestampMixin, UtcDateTime, utcnow
 from app.models.finance import (
     AccountStatus,
     AccountType,
@@ -42,6 +42,8 @@ from app.models.upload import (
     UploadStatus,
 )
 from app.models.user import TIER_GUEST, TIER_LIMITED, TIER_OWNER, TIER_TRUSTED, User
+from app.models.video import Video, VideoStatus
+from app.models.voice import VoiceProfile
 
 __all__ = [
     "AccountStatus",
@@ -71,6 +73,7 @@ __all__ = [
     "TIER_OWNER",
     "TIER_TRUSTED",
     "TimestampMixin",
+    "UtcDateTime",
     "TodoCompletion",
     "TodoPriority",
     "TodoRecurrence",
@@ -81,6 +84,9 @@ __all__ = [
     "UploadSchedule",
     "UploadStatus",
     "User",
+    "Video",
+    "VideoStatus",
+    "VoiceProfile",
     "Workflow",
     "utcnow",
 ]

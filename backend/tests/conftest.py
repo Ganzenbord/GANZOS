@@ -21,26 +21,32 @@ os.environ["GANZ_ENCRYPTION_KEY"] = "8sT2Yb0Vc9kQpLmXnZaWdEfGhIjKlMnOpQrStUvWxYz
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
-from app.database import SessionLocal, engine, get_session  # noqa: E402
-from app.main import app  # noqa: E402
+from app.core.config import get_settings  # noqa: E402
+from app.core.database import Database  # noqa: E402
+from app.main import create_app  # noqa: E402
 from app.models import Base, User  # noqa: E402
 from app.models.user import TIER_LIMITED, TIER_OWNER, TIER_TRUSTED  # noqa: E402
-from app.security import create_token, hash_password  # noqa: E402
-
-
-@pytest.fixture(autouse=True)
-async def fresh_database():
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.drop_all)
-        await connection.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.drop_all)
+from app.core.security import create_token, hash_password  # noqa: E402
 
 
 @pytest.fixture
-async def session():
-    async with SessionLocal() as db:
+async def database():
+    """Elke test zijn eigen verbinding, opgeruimd als hij klaar is."""
+    db = Database.from_url(os.environ["GANZ_DATABASE_URL"])
+    async with db.engine.begin() as connection:
+        await connection.run_sync(Base.metadata.drop_all)
+        await connection.run_sync(Base.metadata.create_all)
+    try:
+        yield db
+    finally:
+        async with db.engine.begin() as connection:
+            await connection.run_sync(Base.metadata.drop_all)
+        await db.dispose()
+
+
+@pytest.fixture
+async def session(database):
+    async with database.session() as db:
         yield db
 
 
@@ -73,18 +79,18 @@ async def limited(session) -> User:
 
 
 @pytest.fixture
-async def client():
-    """Deelt de sessie van de test, zodat wat de test schrijft ook zichtbaar is."""
+async def app(database):
+    """De echte app, met de database van de test erin. Niets hoeft te worden vervangen."""
+    application = create_app(settings=get_settings(), database=database)
+    async with application.router.lifespan_context(application):
+        yield application
 
-    async def override():
-        async with SessionLocal() as db:
-            yield db
 
-    app.dependency_overrides[get_session] = override
+@pytest.fixture
+async def client(app):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test/api") as http:
         yield http
-    app.dependency_overrides.clear()
 
 
 def auth_headers(user: User, confirm: bool = False) -> dict[str, str]:

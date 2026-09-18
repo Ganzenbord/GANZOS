@@ -10,10 +10,10 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, utcnow
+from app.models.base import Base, UtcDateTime, utcnow
 
 
 class ActivityAction(StrEnum):
@@ -62,5 +62,5 @@ class ActivityLogEntry(Base):
     message: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     context: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), index=True
+        UtcDateTime, default=utcnow, server_default=func.now(), index=True
     )
