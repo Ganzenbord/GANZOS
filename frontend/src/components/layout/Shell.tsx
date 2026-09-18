@@ -45,8 +45,10 @@ export function Shell({ data, children }: { data: Dashboard | null; children: Re
   const can = (key: string) => permissions.includes(key)
 
   const primary: NavItem[] = [
-    { to: '/', label: 'Command center', icon: <IconHome size={17} /> },
+    { to: '/command-center', label: 'Command center', icon: <IconHome size={17} /> },
     { to: '/core', label: 'Ganz Core', icon: <IconCore size={17} /> },
+    { to: '/skills', label: 'Skills', icon: <IconSkills size={17} /> },
+    { to: '/tasks', label: 'Taken', icon: <IconFlow size={17} /> },
     {
       to: '/todos',
       label: 'To do & taken',

@@ -75,9 +75,20 @@ frontend/
     hooks/          dashboard ophalen, klok, aftellen
     pages/          de schermen
     lib/format.ts   alle opmaak van getallen en tijden
-electron/           de desktopschil
+electron/
+  main.cjs          venster en levensloop
+  backend.cjs       draait er een Ganz op dit adres?
+  settings.cjs      waar die dan draait, bewaard tussen twee keer opstarten
+  preload.cjs       de smalle brug naar het venster
+  offline.html      wat je ziet als de backend er niet is
+  tests/            wat je kunt nalopen zonder scherm
 docs/               deze documentatie
 ```
+
+De frontend haalt zijn gegevens via `/api` op dezelfde host. In de desktopschil kan dat niet
+— die laadt de pagina van schijf (`file://`) en dan wijst een relatief pad nergens heen.
+Electron geeft het adres daarom door via `preload.cjs`, en `client.ts` haalt dat één keer op
+vóór het eerste verzoek. Zie [deployment.md](deployment.md).
 
 ## De applicatie wordt gemaakt door een functie
 

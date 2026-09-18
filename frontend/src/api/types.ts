@@ -212,3 +212,87 @@ export interface Integration {
   status_detail: string | null
   last_checked_at: string | null
 }
+
+
+/* --- Skills en taken (fase 3) --------------------------------------------- */
+
+export interface SkillStep {
+  tool: string
+  action?: string | null
+  [key: string]: unknown
+}
+
+export interface Skill {
+  id: number
+  name: string
+  description: string | null
+  category: string | null
+  enabled: boolean
+  trigger_pattern: string | null
+  steps: SkillStep[]
+  required_permission: string | null
+  run_count: number
+  success_count: number
+  failure_count: number
+  version: number
+  last_used_at: string | null
+}
+
+export interface Tool {
+  name: string
+  description: string
+  sensitive: boolean
+  /** Zolang dit waar is heeft Ganz de stap nagelopen maar niets in de buitenwereld gedaan. */
+  simulated: boolean
+}
+
+export interface Task {
+  id: number
+  title: string
+  description: string | null
+  status: string
+  skill_id: number | null
+  match_confidence: number | null
+  /** Waarom deze skill gekozen is, of waarom geen enkele. */
+  match_reason: string | null
+  result: Record<string, unknown>
+  error: string | null
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+}
+
+export interface MatchResult {
+  matched: boolean
+  confidence: number
+  threshold: number
+  reason: string
+  backend: string
+  skill: Skill | null
+  task: Task
+}
+
+/* --- Het Command Center (fase 4) ------------------------------------------ */
+
+export interface ScheduleItem {
+  kind: 'upload' | 'task'
+  id: number
+  title: string
+  at: string
+  status: string
+  done: boolean
+}
+
+export interface ScheduleToday {
+  day: string
+  items: ScheduleItem[]
+  total: number
+  open: number
+}
+
+export interface MemoryOverview {
+  memory_count: number
+  session_count: number
+  activity_count: number
+  recent_activity: { id: number; action: string; message: string | null; created_at: string }[]
+}

@@ -8,7 +8,11 @@
     "app": "electron .",
     "app:dev": "GANZ_DEV=1 electron .",
     "build:frontend": "npm --prefix frontend run build",
-    "app:build": "npm run build:frontend && electron-builder"
+    "app:build": "npm run build:frontend && electron-builder",
+    "app:build:win": "npm run build:frontend && electron-builder --win",
+    "app:build:mac": "npm run build:frontend && electron-builder --mac",
+    "app:build:linux": "npm run build:frontend && electron-builder --linux",
+    "test:shell": "node electron/tests/shell.test.mjs"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -17,9 +21,29 @@
   "build": {
     "appId": "nl.ganzenbord.ganz",
     "productName": "Ganz",
-    "files": ["electron/**", "frontend/dist/**"],
-    "mac": { "category": "public.app-category.productivity" },
-    "win": { "target": "nsis" },
-    "linux": { "target": "AppImage" }
+    "files": [
+      "electron/**",
+      "!electron/tests/**",
+      "frontend/dist/**"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
   }
 }

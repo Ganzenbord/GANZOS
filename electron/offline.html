@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ganz — geen verbinding</title>
+    <style>
+      /* Bewust losse opmaak in plaats van de stylesheet van de app: deze pagina moet het
+         juist doen wanneer de rest het niet doet. */
+      :root {
+        --navy: #080c14;
+        --panel: #0f1725;
+        --rand: #1c2942;
+        --tekst: #dbe4f3;
+        --grijs: #8494ae;
+        --amber: #f0a132;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: var(--navy);
+        color: var(--tekst);
+        font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .kaart {
+        width: min(560px, 100%);
+        background: var(--panel);
+        border: 1px solid var(--rand);
+        border-radius: 16px;
+        padding: 32px;
+      }
+      .gans { font-size: 40px; line-height: 1; margin-bottom: 16px; }
+      h1 { font-size: 21px; margin: 0 0 8px; }
+      p { margin: 0 0 16px; color: var(--grijs); }
+      .reden {
+        background: #0a101c;
+        border: 1px solid var(--rand);
+        border-left: 3px solid var(--amber);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 20px;
+        color: var(--tekst);
+        word-break: break-word;
+      }
+      label { display: block; font-size: 13px; color: var(--grijs); margin-bottom: 6px; }
+      input {
+        width: 100%;
+        padding: 11px 13px;
+        border-radius: 9px;
+        border: 1px solid var(--rand);
+        background: #0a101c;
+        color: var(--tekst);
+        font: inherit;
+        margin-bottom: 16px;
+      }
+      input:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
+      .knoppen { display: flex; gap: 10px; flex-wrap: wrap; }
+      button {
+        padding: 11px 18px;
+        border-radius: 9px;
+        border: 1px solid var(--rand);
+        background: #162134;
+        color: var(--tekst);
+        font: inherit;
+        cursor: pointer;
+      }
+      button.primair { background: var(--amber); border-color: var(--amber); color: #201400; font-weight: 600; }
+      button:disabled { opacity: 0.55; cursor: default; }
+      .hulp { margin-top: 22px; font-size: 13px; color: var(--grijs); }
+      .hulp code {
+        background: #0a101c;
+        border: 1px solid var(--rand);
+        border-radius: 5px;
+        padding: 1px 6px;
+        font-size: 12px;
+      }
+      .melding { margin-top: 14px; font-size: 13px; min-height: 20px; }
+      .melding.fout { color: #f08a8a; }
+      .melding.goed { color: #7fd6a2; }
+    </style>
+  </head>
+  <body>
+    <main class="kaart">
+      <div class="gans" aria-hidden="true">🪿</div>
+      <h1>Ganz is niet bereikbaar</h1>
+      <p>De app zelf werkt; hij vindt alleen de backend niet.</p>
+
+      <div class="reden" id="reden">—</div>
+
+      <label for="adres">Adres van de backend</label>
+      <input id="adres" type="url" spellcheck="false" placeholder="http://localhost:8000" />
+
+      <div class="knoppen">
+        <button class="primair" id="opnieuw" type="button">Opnieuw proberen</button>
+        <button id="opslaan" type="button">Adres opslaan en proberen</button>
+      </div>
+      <div class="melding" id="melding"></div>
+
+      <div class="hulp">
+        <p>De backend start je zelf. In de map <code>backend</code>:</p>
+        <p><code>uvicorn app.main:app --port 8000</code></p>
+        <p>
+          Draait hij ergens anders, vul dat adres hierboven in. Het wordt bewaard, dus dit
+          hoeft maar één keer.
+        </p>
+      </div>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(location.search)
+      const redenEl = document.getElementById('reden')
+      const adresEl = document.getElementById('adres')
+      const meldingEl = document.getElementById('melding')
+      const opnieuwEl = document.getElementById('opnieuw')
+      const opslaanEl = document.getElementById('opslaan')
+
+      redenEl.textContent = params.get('reason') || 'Onbekende oorzaak'
+      adresEl.value = params.get('api') || 'http://localhost:8000'
+
+      function melden(tekst, soort) {
+        meldingEl.textContent = tekst
+        meldingEl.className = 'melding' + (soort ? ' ' + soort : '')
+      }
+
+      function bezig(aan) {
+        opnieuwEl.disabled = aan
+        opslaanEl.disabled = aan
+      }
+
+      opnieuwEl.addEventListener('click', async () => {
+        bezig(true)
+        melden('Bezig met proberen…')
+        // Lukt het, dan vervangt het hoofdproces deze pagina door het scherm; daarom staat
+        // er hieronder geen "gelukt" — dat zie je vanzelf.
+        await window.ganz.retry()
+        bezig(false)
+        melden('Nog steeds geen verbinding.', 'fout')
+      })
+
+      opslaanEl.addEventListener('click', async () => {
+        bezig(true)
+        melden('Adres opslaan…')
+        const uitkomst = await window.ganz.setApiUrl(adresEl.value)
+        adresEl.value = uitkomst.apiUrl
+        if (uitkomst.health.ok) {
+          melden('Gevonden. Ganz wordt geladen…', 'goed')
+          await window.ganz.retry()
+          return
+        }
+        redenEl.textContent = uitkomst.health.reason
+        bezig(false)
+        melden('Opgeslagen, maar daar antwoordt niets.', 'fout')
+      })
+
+      adresEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') opslaanEl.click()
+      })
+    </script>
+  </body>
+</html>

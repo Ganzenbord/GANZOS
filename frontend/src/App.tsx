@@ -9,6 +9,8 @@ import { TodosPage } from './pages/TodosPage'
 import { FinancePage } from './pages/FinancePage'
 import { ChannelsPage } from './pages/ChannelsPage'
 import { ModulePage } from './pages/ModulePage'
+import { SkillsPage } from './pages/SkillsPage'
+import { TasksPage } from './pages/TasksPage'
 import { Panel } from './components/ui/Panel'
 
 // Electron laadt de bestanden van schijf; daar werkt alleen een hash-router.
@@ -76,7 +78,16 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
         <Unreachable message={error} onRetry={refresh} />
       ) : data ? (
         <Routes>
-          <Route path="/" element={<DashboardPage data={data} refresh={refresh} />} />
+          {/* /command-center is het echte adres; / stuurt erheen. Een eigen route in
+              plaats van een verborgen div, zodat de knop "terug" van de browser en de
+              desktopschil doen wat je verwacht. */}
+          <Route path="/" element={<Navigate to="/command-center" replace />} />
+          <Route
+            path="/command-center"
+            element={<DashboardPage data={data} refresh={refresh} />}
+          />
+          <Route path="/skills" element={<SkillsPage canWrite={can('skills.write')} />} />
+          <Route path="/tasks" element={<TasksPage canWrite={can('tasks.write')} />} />
           <Route path="/todos" element={<TodosPage canWrite={can('todo.write')} />} />
           <Route
             path="/finance"
@@ -247,7 +258,7 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
               />
             }
           />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/command-center" replace />} />
         </Routes>
       ) : null}
     </Shell>

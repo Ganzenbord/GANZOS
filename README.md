@@ -92,8 +92,20 @@ npm run build:frontend
 npm run app
 ```
 
-Draait er nog geen backend, dan start Electron hem er zelf bij vanuit
-`backend/.venv`.
+De schil start **geen** backend — die start je zelf (stap 2). Draait er niets op
+`http://localhost:8000`, dan krijg je geen wit venster maar een pagina die zegt wat eraan
+scheelt, met een veld om een ander adres in te vullen. Dat adres wordt bewaard, dus dat hoeft
+maar één keer.
+
+Draait Ganz ergens anders — op een ander poortnummer, of op een machine in huis — dan kan dat
+ook zonder de app te openen:
+
+```bash
+GANZ_API_URL=http://192.168.1.50:8000 npm run app
+```
+
+Een installeerbaar programma bouwen voor Windows, macOS of Linux: zie
+[docs/deployment.md](docs/deployment.md).
 
 ---
 
@@ -242,6 +254,7 @@ paneel met uitleg, geen voorbeeldbedrag.
 | [docs/security.md](docs/security.md) | tiers, bevestiging, sleutels |
 | [docs/voice.md](docs/voice.md) | stemherkenning en wat een stem wel en niet opent |
 | [docs/skills.md](docs/skills.md) | skills, taken, matchen en uitvoeren |
+| [docs/deployment.md](docs/deployment.md) | draaien, de desktopschil, en installers bouwen |
 | [docs/todos.md](docs/todos.md) | de dagelijkse takenlijst |
 | [docs/finance.md](docs/finance.md) | vermogen, valuta, providers |
 | [docs/social.md](docs/social.md) | gecombineerde kanaalstatistieken |

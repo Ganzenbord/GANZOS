@@ -514,3 +514,140 @@ input, select, textarea { font: inherit; }
   }
   .bottomnav__item--active { color: var(--amber); }
 }
+
+/* ── Lijsten met een regel per ding (skills, taken, gereedschap) ────────────
+   Eén opzet voor alle drie: links waar het over gaat, rechts de cijfers en de
+   knoppen. Op een smal scherm zakt de rechterkant eronder in plaats van te
+   knijpen — anders staan er drie knoppen van een centimeter breed. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.listrow {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.listrow--compact {
+  padding: 9px 12px;
+}
+
+.listrow__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.listrow__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.listrow__title code {
+  font-size: 12.5px;
+  color: var(--amber);
+}
+
+.listrow__sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.listrow__sub--error {
+  color: var(--red);
+}
+
+.listrow__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.listrow__muted {
+  color: var(--text-dim);
+}
+
+.listrow__buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.tag--warn {
+  border-color: var(--amber-dim);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.btn--small {
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+
+.inlineform {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.inlineform input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+}
+
+.inlineform input:focus {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+@media (max-width: 768px) {
+  .listrow {
+    flex-direction: column;
+  }
+
+  .listrow__side {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .listrow__buttons {
+    justify-content: flex-start;
+  }
+}

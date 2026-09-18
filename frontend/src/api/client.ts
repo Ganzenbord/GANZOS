@@ -4,7 +4,39 @@
    is kort geldig en hoort niet op schijf te blijven staan na het sluiten. */
 
 const TOKEN_KEY = 'ganz.token'
-const BASE = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
+
+/** Waar de backend draait.
+ *
+ *  In de browser is dat `/api` op dezelfde host — dat werkt met de proxy van Vite en achter
+ *  een webserver. In de desktopschil kan dat niet: die laadt de pagina van schijf (file://),
+ *  en dan wijst een relatief pad nergens heen. Electron geeft het adres daarom mee via
+ *  `window.ganz`, en dat wordt hier eenmalig opgehaald.
+ */
+declare global {
+  interface Window {
+    ganz?: { apiUrl: () => Promise<string>; platform?: string }
+  }
+}
+
+const WEB_BASE = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
+let base = WEB_BASE
+
+/** Haalt het adres op bij de schil. Roep dit één keer aan vóór het eerste verzoek. */
+export async function resolveApiBase(): Promise<string> {
+  if (!window.ganz) return base
+  try {
+    const url = await window.ganz.apiUrl()
+    // De backend zet zijn endpoints onder /api; de schil kent alleen de host.
+    base = `${url.replace(/\/+$/, '')}/api`
+  } catch {
+    /* Lukt het niet, dan blijft het relatieve pad staan; dat faalt met een nette melding. */
+  }
+  return base
+}
+
+export function apiBase(): string {
+  return base
+}
 
 let confirmationToken: string | null = null
 
@@ -57,7 +89,7 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
   if (options.confirm && confirmationToken) headers['X-Ganz-Confirmation'] = confirmationToken
 
-  const response = await fetch(`${BASE}${path}`, {
+  const response = await fetch(`${base}${path}`, {
     method: options.method ?? 'GET',
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
