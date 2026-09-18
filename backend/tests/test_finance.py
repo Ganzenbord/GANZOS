@@ -12,7 +12,7 @@ from app.integrations.base import Balance, ProviderAuthError, ProviderError
 from app.integrations.finance.registry import register_finance_provider
 from app.models.finance import AccountStatus, AccountType, FinanceSnapshot
 from app.services import finance_service
-from tests.conftest import auth_headers
+from tests.conftest import auth_headers, confirm_headers
 
 
 class FakeProvider:
@@ -209,7 +209,7 @@ async def test_finance_is_tier_one_only(client, owner, trusted):
     assert blocked.status_code == 403
 
 
-async def test_managing_accounts_needs_a_second_confirmation(client, owner):
+async def test_managing_accounts_needs_a_second_confirmation(client, owner, session):
     payload = {
         "provider": "manual",
         "account_type": "bank",
@@ -221,13 +221,13 @@ async def test_managing_accounts_needs_a_second_confirmation(client, owner):
     assert without.status_code == 428
 
     with_confirm = await client.post(
-        "/finance/accounts", json=payload, headers=auth_headers(owner, confirm=True)
+        "/finance/accounts", json=payload, headers=await confirm_headers(session, owner)
     )
     assert with_confirm.status_code == 201
     assert with_confirm.json()["current_value_eur"] == "500.00"
 
 
-async def test_credentials_never_leave_the_backend(client, owner):
+async def test_credentials_never_leave_the_backend(client, owner, session):
     await client.post(
         "/finance/accounts",
         json={
@@ -236,7 +236,7 @@ async def test_credentials_never_leave_the_backend(client, owner):
             "name": "Rekening",
             "credentials": {"value": "12.34", "api_key": "geheim"},
         },
-        headers=auth_headers(owner, confirm=True),
+        headers=await confirm_headers(session, owner),
     )
     listing = await client.get("/finance/accounts", headers=auth_headers(owner))
     body = listing.text
@@ -244,7 +244,7 @@ async def test_credentials_never_leave_the_backend(client, owner):
     assert "credentials" not in body
 
 
-async def test_activity_log_holds_no_amounts(client, owner):
+async def test_activity_log_holds_no_amounts(client, owner, session):
     await client.post(
         "/finance/accounts",
         json={
@@ -253,14 +253,14 @@ async def test_activity_log_holds_no_amounts(client, owner):
             "name": "Rekening",
             "credentials": {"value": "98765.43"},
         },
-        headers=auth_headers(owner, confirm=True),
+        headers=await confirm_headers(session, owner),
     )
     activity = await client.get("/activity", headers=auth_headers(owner))
     assert "98765" not in activity.text
     assert "FINANCE_ACCOUNT_CONNECTED" in activity.text
 
 
-async def test_sync_timestamp_is_returned_with_a_timezone(client, owner):
+async def test_sync_timestamp_is_returned_with_a_timezone(client, owner, session):
     """Anders leest de browser 'zojuist bijgewerkt' als lokale tijd en klopt het niet."""
     await client.post(
         "/finance/accounts",
@@ -270,7 +270,7 @@ async def test_sync_timestamp_is_returned_with_a_timezone(client, owner):
             "name": "Rekening",
             "credentials": {"value": "10.00"},
         },
-        headers=auth_headers(owner, confirm=True),
+        headers=await confirm_headers(session, owner),
     )
     accounts = (await client.get("/finance/accounts", headers=auth_headers(owner))).json()
     stamp = accounts[0]["last_synced_at"]

@@ -1,0 +1,88 @@
+# Bouwt de desktop-app voor Windows en macOS op de computers van GitHub zelf.
+#
+# Waarom dit bestaat: voor Windows bouw je op Windows en voor macOS op een Mac. Wie maar één
+# van de twee heeft staan, kan de andere niet maken — zie docs/deployment.md. GitHub heeft ze
+# allebei, dus laat die het doen.
+#
+# Zo gebruik je hem:
+#   1. Ga in de repo naar het tabblad Actions → "Desktop-app bouwen" → Run workflow.
+#   2. Wacht een minuut of tien.
+#   3. Onderaan die pagina staan de bestanden onder Artifacts. Download wat je nodig hebt.
+#
+# Zet je een versielabel op een commit (git tag v2.0.1 && git push --tags), dan komen de
+# bestanden bovendien onder Releases te staan, met een vaste downloadlink.
+
+name: Desktop-app bouwen
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  bouwen:
+    name: ${{ matrix.naam }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      # Zonder dit mag de opdracht wel bouwen maar niets onder Releases zetten, en dat merk
+      # je pas als de laatste stap struikelt.
+      contents: write
+    strategy:
+      # Gaat er één stuk, dan wil je de andere nog steeds hebben.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            naam: Windows
+            doel: --win
+          - os: macos-latest
+            naam: macOS
+            doel: --mac
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # De schil en het scherm hebben elk hun eigen package.json.
+      - name: Pakketten ophalen
+        run: |
+          npm ci
+          npm ci --prefix frontend
+
+      - name: Het scherm bouwen
+        run: npm run build:frontend
+
+      # --publish never: bouwen mag, uit zichzelf ergens neerzetten niet. Het uploaden
+      # gebeurt hieronder, en alleen als er een versielabel aan te pas komt.
+      - name: De app bouwen
+        run: npx electron-builder ${{ matrix.doel }} --publish never
+        env:
+          # Zonder certificaat valt er niets te ondertekenen. Dat is bekend en het staat in
+          # docs/deployment.md; laat de build er niet op struikelen.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Bestanden bewaren
+        uses: actions/upload-artifact@v4
+        with:
+          name: ganz-${{ matrix.naam }}
+          # Alleen wat je kunt downloaden en openen, niet de uitgepakte mappen ernaast.
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Bij een versielabel ook onder Releases zetten
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release create "${GITHUB_REF_NAME}" --title "Ganz ${GITHUB_REF_NAME}" \
+            --notes "Niet ondertekend; zie docs/deployment.md voor wat Windows en macOS daarvan zeggen." \
+            || echo "Release bestond al; alleen de bestanden worden toegevoegd."
+          gh release upload "${GITHUB_REF_NAME}" dist/*.exe dist/*.dmg dist/*.zip --clobber

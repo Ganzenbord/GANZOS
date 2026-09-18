@@ -1,76 +1,60 @@
 /* De desktopschil van Ganz.
  *
- * Electron toont hetzelfde scherm als de webversie. Staat er een backend in de map
- * (met een virtualomgeving), dan start hij die er zelf bij; draait er al een server
- * op de ingestelde poort, dan sluit hij daarop aan. */
+ * Alleen een schil: hij start geen backend en doet zelf niets met gegevens. Hij zoekt een
+ * draaiende Ganz op het ingestelde adres en toont het scherm. Is die er niet, dan komt er
+ * een pagina die zegt wat eraan scheelt — nooit een wit venster.
+ *
+ * Eerder startte deze schil de backend zelf op als er een virtualomgeving in de map stond.
+ * Dat leek handig maar maakt de schil verantwoordelijk voor iets wat hij niet kan overzien:
+ * welke Python, welke database, welke migraties. De backend start je nu zelf (of hij draait
+ * al als dienst), en de schil sluit erop aan.
+ */
 
-const { app, BrowserWindow, shell } = require('electron')
-const { spawn } = require('node:child_process')
+const { app, BrowserWindow, ipcMain, shell } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
-const http = require('node:http')
+const settings = require('./settings.cjs')
+const { checkBackend } = require('./backend.cjs')
 
-const API_PORT = Number(process.env.GANZ_PORT || 8000)
-const API_HOST = '127.0.0.1'
 const DEV_URL = process.env.GANZ_DEV_URL || 'http://localhost:5173'
 
-let backend = null
 let mainWindow = null
 
-function backendPython() {
-  const root = path.join(__dirname, '..', 'backend')
-  // Windows zet de uitvoerbare bestanden in Scripts/, macOS en Linux in bin/.
-  const candidates = [
-    path.join(root, '.venv', 'bin', 'python'),
-    path.join(root, '.venv', 'Scripts', 'python.exe'),
-  ]
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null
+function bundledIndex() {
+  return path.join(__dirname, '..', 'frontend', 'dist', 'index.html')
 }
 
-function isBackendUp() {
-  return new Promise((resolve) => {
-    const request = http.get(
-      { host: API_HOST, port: API_PORT, path: '/health', timeout: 800 },
-      (response) => {
-        response.resume()
-        resolve(response.statusCode === 200)
-      },
-    )
-    request.on('error', () => resolve(false))
-    request.on('timeout', () => {
-      request.destroy()
-      resolve(false)
-    })
-  })
-}
+/** Laad het scherm, of de uitlegpagina als er iets niet klopt. */
+async function loadApp(window) {
+  const apiUrl = settings.apiUrl(app)
+  const health = await checkBackend(apiUrl)
 
-async function waitForBackend(attempts = 40) {
-  for (let i = 0; i < attempts; i += 1) {
-    if (await isBackendUp()) return true
-    await new Promise((resolve) => setTimeout(resolve, 500))
+  if (!health.ok) {
+    await showOffline(window, apiUrl, health.reason)
+    return
   }
-  return false
+
+  if (process.env.GANZ_DEV === '1') {
+    await window.loadURL(DEV_URL)
+    return
+  }
+  if (fs.existsSync(bundledIndex())) {
+    await window.loadFile(bundledIndex())
+    return
+  }
+  // Wel een backend, geen gebouwd scherm. Ook dat is iets om uit te leggen in plaats van
+  // een leeg venster te tonen.
+  await showOffline(
+    window,
+    apiUrl,
+    'Het scherm is nog niet gebouwd. Draai eerst: npm run build:frontend',
+  )
 }
 
-async function startBackend() {
-  if (await isBackendUp()) return
-  const python = backendPython()
-  if (!python) return
-
-  backend = spawn(
-    python,
-    ['-m', 'uvicorn', 'app.main:app', '--host', API_HOST, '--port', String(API_PORT)],
-    {
-      cwd: path.join(__dirname, '..', 'backend'),
-      // Anders flitsen er op Windows zwarte vensters op bij het starten.
-      windowsHide: true,
-      stdio: 'ignore',
-    },
-  )
-  backend.on('error', () => {
-    backend = null
+function showOffline(window, apiUrl, reason) {
+  return window.loadFile(path.join(__dirname, 'offline.html'), {
+    query: { api: apiUrl, reason: reason || 'Onbekende oorzaak' },
   })
-  await waitForBackend()
 }
 
 function createWindow() {
@@ -82,20 +66,12 @@ function createWindow() {
     backgroundColor: '#080c14',
     title: 'Ganz — Command Center',
     webPreferences: {
-      // De schil heeft geen toegang tot Node nodig; alles loopt via de API.
+      // De schil heeft geen Node nodig; alles loopt via de API.
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   })
-
-  const bundled = path.join(__dirname, '..', 'frontend', 'dist', 'index.html')
-  if (process.env.GANZ_DEV === '1') {
-    mainWindow.loadURL(DEV_URL)
-  } else if (fs.existsSync(bundled)) {
-    mainWindow.loadFile(bundled)
-  } else {
-    mainWindow.loadURL(`http://${API_HOST}:${API_PORT}/health`)
-  }
 
   // Externe links horen in de gewone browser, niet in de app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -103,27 +79,42 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+  // Laadt het scherm niet (netwerk weg, adres verkeerd), dan alsnog de uitlegpagina in
+  // plaats van het lege venster dat Electron anders laat staan.
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
+    if (!isMainFrame || code === -3) return // -3 = door ons afgebroken
+    void showOffline(mainWindow, settings.apiUrl(app), `Het scherm laadde niet: ${description}`)
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
+  return mainWindow
 }
 
-app.whenReady().then(async () => {
-  await startBackend()
-  createWindow()
+ipcMain.handle('ganz:api-url', () => settings.apiUrl(app))
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+ipcMain.handle('ganz:set-api-url', async (_event, url) => {
+  const schoon = settings.setApiUrl(app, url)
+  return { apiUrl: schoon, health: await checkBackend(schoon) }
+})
+
+ipcMain.handle('ganz:retry', async () => {
+  if (mainWindow) await loadApp(mainWindow)
+})
+
+app.whenReady().then(async () => {
+  const window = createWindow()
+  await loadApp(window)
+
+  app.on('activate', async () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      await loadApp(createWindow())
+    }
   })
 })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
-})
-
-app.on('before-quit', () => {
-  if (backend) {
-    backend.kill()
-    backend = null
-  }
 })

@@ -9,6 +9,13 @@ import { TodosPage } from './pages/TodosPage'
 import { FinancePage } from './pages/FinancePage'
 import { ChannelsPage } from './pages/ChannelsPage'
 import { ModulePage } from './pages/ModulePage'
+import { SkillsPage } from './pages/SkillsPage'
+import { TasksPage } from './pages/TasksPage'
+import { DevicesCard } from './components/panels/DevicesCard'
+import { IntegrationsCard } from './components/panels/IntegrationsCard'
+import { PasswordCard } from './components/panels/PasswordCard'
+import { PinCard } from './components/panels/PinCard'
+import { YouTubeCard } from './components/panels/YouTubeCard'
 import { Panel } from './components/ui/Panel'
 
 // Electron laadt de bestanden van schijf; daar werkt alleen een hash-router.
@@ -76,7 +83,16 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
         <Unreachable message={error} onRetry={refresh} />
       ) : data ? (
         <Routes>
-          <Route path="/" element={<DashboardPage data={data} refresh={refresh} />} />
+          {/* /command-center is het echte adres; / stuurt erheen. Een eigen route in
+              plaats van een verborgen div, zodat de knop "terug" van de browser en de
+              desktopschil doen wat je verwacht. */}
+          <Route path="/" element={<Navigate to="/command-center" replace />} />
+          <Route
+            path="/command-center"
+            element={<DashboardPage data={data} refresh={refresh} />}
+          />
+          <Route path="/skills" element={<SkillsPage canWrite={can('skills.write')} />} />
+          <Route path="/tasks" element={<TasksPage canWrite={can('tasks.write')} />} />
           <Route path="/todos" element={<TodosPage canWrite={can('todo.write')} />} />
           <Route
             path="/finance"
@@ -93,7 +109,11 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
           <Route
             path="/youtube"
             element={
-              can('social.read') ? <ChannelsPage platform="youtube" /> : <Navigate to="/" replace />
+              can('social.read') ? (
+                <ChannelsPage platform="youtube" intro={<YouTubeCard />} />
+              ) : (
+                <Navigate to="/" replace />
+              )
             }
           />
           <Route
@@ -186,6 +206,10 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
               <ModulePage
                 title="Activiteitenlog"
                 endpoint="/activity?limit=200"
+                // /activity levert een pagina: de lijst zit in `items`, met het totaal ernaast.
+                pick={(payload) =>
+                  (payload as { items: Record<string, unknown>[] }).items ?? []
+                }
                 columns={[
                   { key: 'created_at', label: 'Wanneer', kind: 'datetime' },
                   { key: 'action', label: 'Gebeurtenis' },
@@ -235,6 +259,14 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
               <ModulePage
                 title="Instellingen — rechten"
                 endpoint="/auth/permissions"
+                intro={
+                  <>
+                    <PasswordCard />
+                    <PinCard />
+                    <DevicesCard />
+                    {can('integrations.read') ? <IntegrationsCard /> : null}
+                  </>
+                }
                 columns={[
                   { key: 'key', label: 'Recht' },
                   { key: 'granted', label: 'Jij mag dit' },
@@ -243,7 +275,7 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
               />
             }
           />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/command-center" replace />} />
         </Routes>
       ) : null}
     </Shell>

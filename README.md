@@ -84,6 +84,25 @@ npm run dev
 
 Open http://localhost:5173 en log in.
 
+Dezelfde pagina werkt op je telefoon. Standaard luistert de ontwikkelserver alleen op deze
+computer; wil je hem op je telefoon openen, start hem dan zo:
+
+```bash
+npm run dev:telefoon
+```
+
+In het venster staat dan een adres als `http://192.168.1.50:5173` — dat typ je op je telefoon
+over. Onder 768 pixels verdwijnt de zijbalk en komt er een balk onderaan; alles wat daar niet
+op past zit achter **Meer**. Zie
+[docs/architecture.md](docs/architecture.md#op-een-telefoon).
+
+Doe dit alleen op je eigen netwerk: iedereen die op dat moment op datzelfde wifi zit, kan het
+inlogscherm openen.
+
+Handig voor onderweg: stel bij **Instellingen** een pincode in. Daarmee bevestig je
+gevoelige handelingen zonder je hele wachtwoord op een klein toetsenbord in te tikken.
+Inloggen blijft met je wachtwoord.
+
 ### 4. Desktop-app (optioneel)
 
 ```bash
@@ -92,8 +111,102 @@ npm run build:frontend
 npm run app
 ```
 
-Draait er nog geen backend, dan start Electron hem er zelf bij vanuit
-`backend/.venv`.
+De schil start **geen** backend — die start je zelf (stap 2). Draait er niets op
+`http://localhost:8000`, dan krijg je geen wit venster maar een pagina die zegt wat eraan
+scheelt, met een veld om een ander adres in te vullen. Dat adres wordt bewaard, dus dat hoeft
+maar één keer.
+
+Draait Ganz ergens anders — op een ander poortnummer, of op een machine in huis — dan kan dat
+ook zonder de app te openen:
+
+```bash
+GANZ_API_URL=http://192.168.1.50:8000 npm run app
+```
+
+Een installeerbaar programma bouwen voor Windows, macOS of Linux: zie
+[docs/deployment.md](docs/deployment.md).
+
+---
+
+## Stemherkenning (optioneel)
+
+Ganz kan je herkennen aan je stem. Die stap is los, want SpeechBrain brengt torch mee —
+samen ruim een gigabyte. Zonder deze stap draait alles gewoon; alleen de stem-endpoints
+geven dan een nette melding.
+
+```bash
+cd backend
+pip install -r requirements-voice.txt
+```
+
+**1. Neem een fragment op** van een seconde of tien, als WAV:
+
+```bash
+ffmpeg -i opname.m4a -ac 1 -ar 16000 stef.wav
+```
+
+**2. Schrijf je stem in.** De allereerste keer mag dat zonder inloggen — anders kom je er
+nooit in:
+
+```bash
+curl -X POST http://localhost:8000/api/voice/enroll -F user_id=1 -F audio=@stef.wav
+```
+
+Daarna vraagt inschrijven om het recht `voice.enroll` (tier 1) én een tweede bevestiging.
+Zet in je `.env`:
+
+```
+GANZ_VOICE_ENROLLMENT_OPEN_WHEN_EMPTY=false
+```
+
+**3. Laat je herkennen.** Je krijgt een gewoon inlogtoken terug:
+
+```bash
+curl -X POST http://localhost:8000/api/voice/identify -F audio=@opname.wav
+```
+
+Een herkende stem is een aanmelding, **geen bevestiging**: voor alles wat geld kost, naar
+buiten gaat of iets vernietigt, vraagt Ganz er nog een wachtwoord of pincode bovenop — ook
+van jou. En was de herkenning zwak, dan kan er met dat token helemaal niets bevestigd
+worden. Zie [docs/voice.md](docs/voice.md).
+
+Werkt het niet zoals je wilt:
+
+| Wat je ziet | Wat je doet |
+| --- | --- |
+| `503` op de stem-endpoints | `pip install -r backend/requirements-voice.txt` |
+| `"result": "unknown"` terwijl jij het bent | verlaag `GANZ_VOICE_MATCH_THRESHOLD`, bijvoorbeeld naar `0.20` |
+| iemand anders wordt voor jou aangezien | verhoog hem, bijvoorbeeld naar `0.35`. Dit is het ergere geval van de twee |
+| `"strong": false` | de herkenning was te zwak voor gevoelige dingen; log in met je wachtwoord |
+
+---
+
+## Skills (optioneel: matchen op betekenis)
+
+Ganz matcht een opdracht op een skill door woorden te vergelijken. Dat werkt meteen en heeft
+niets nodig. Wil je dat hij ook begrijpt dat "zet de video online" en "upload naar YouTube"
+hetzelfde bedoelen, installeer dan het taalmodel — ook dat draait lokaal:
+
+```bash
+cd backend
+pip install -r requirements-skills.txt
+```
+
+In elk antwoord staat welke van de twee gebruikt is (`"backend": "woorden"` of
+`"betekenis"`), dus je ziet meteen of het aanstaat.
+
+> **Let op:** de twee tellen niet hetzelfde. Zet je het model aan, kijk dan opnieuw naar
+> `GANZ_SKILL_MATCH_THRESHOLD`. Zie [docs/skills.md](docs/skills.md).
+
+Van de stappen van een skill doet er sinds fase 7 één écht iets: `youtube.upload`
+publiceert werkelijk een video. De rest wordt nagelopen en gelogd, maar doet nog niets in de
+buitenwereld. Per gereedschap staat dat in het antwoord (`"simulated"`) en in
+`GET /api/skills/tools` — met opzet per gereedschap, want een gereedschap gaat pas van "doet
+alsof" naar "doet het" als de koppeling eronder er echt is.
+
+Voor het uploaden is een koppeling met YouTube nodig. Zie
+[docs/youtube.md](docs/youtube.md); reken op een kwartier eenmalig geklik in de Google
+Cloud-console, dat valt niet te omzeilen.
 
 ---
 
@@ -108,9 +221,16 @@ lijst met uitleg.
 | `GANZ_DATABASE_URL` | localhost | de databaseverbinding |
 | `GANZ_SECRET_KEY` | *ontwikkelwaarde* | ondertekent de inlogtokens |
 | `GANZ_ENCRYPTION_KEY` | *ontwikkelwaarde* | versleutelt de provider-tokens |
-| `GANZ_ACCESS_TOKEN_MINUTES` | `720` | hoe lang een sessie geldig is |
+| `GANZ_ACCESS_TOKEN_MINUTES` | `15` | hoe lang een inlogtoken geldig is |
+| `GANZ_REFRESH_TOKEN_DAYS` | `60` | hoe lang een apparaat ongebruikt mag liggen |
 | `GANZ_CONFIRMATION_TOKEN_MINUTES` | `5` | hoe kort een tweede bevestiging meegaat |
+| `GANZ_CONFIRMATION_MAX_FAILURES` | `5` | zoveel mispogingen en het slot gaat erop |
+| `GANZ_CONFIRMATION_LOCKOUT_MINUTES` | `15` | hoe lang dat slot erop blijft |
 | `GANZ_CORS_ORIGINS` | `http://localhost:5173` | waar de frontend vandaan mag komen |
+| `GANZ_YOUTUBE_CLIENT_ID` | leeg | uit je eigen Google Cloud-project |
+| `GANZ_YOUTUBE_CLIENT_SECRET` | leeg | idem |
+| `GANZ_YOUTUBE_UPLOAD_PRIVACY` | `private` | waar een upload op komt te staan |
+| `GANZ_YOUTUBE_VIDEO_DIR` | leeg | de map met je video's; leeg = uploaden uit |
 | `GANZ_SCHEDULER_ENABLED` | `true` | achtergrondsynchronisatie aan of uit |
 | `GANZ_FINANCE_SYNC_MINUTES` | `15` | hoe vaak financiële accounts worden opgehaald |
 | `GANZ_SOCIAL_SYNC_MINUTES` | `30` | hoe vaak social-kanalen worden opgehaald |
@@ -164,6 +284,11 @@ paneel met uitleg, geen voorbeeldbedrag.
 | [docs/database.md](docs/database.md) | de tabellen en waarom ze zo zijn |
 | [docs/api.md](docs/api.md) | alle eindpunten |
 | [docs/security.md](docs/security.md) | tiers, bevestiging, sleutels |
+| [docs/server.md](docs/server.md) | Ganz als server voor meerdere mensen: netwerk, sessies, rechten |
+| [docs/voice.md](docs/voice.md) | stemherkenning en wat een stem wel en niet opent |
+| [docs/skills.md](docs/skills.md) | skills, taken, matchen en uitvoeren |
+| [docs/youtube.md](docs/youtube.md) | koppelen met YouTube, en echt uploaden |
+| [docs/deployment.md](docs/deployment.md) | draaien, de desktopschil, en installers bouwen |
 | [docs/todos.md](docs/todos.md) | de dagelijkse takenlijst |
 | [docs/finance.md](docs/finance.md) | vermogen, valuta, providers |
 | [docs/social.md](docs/social.md) | gecombineerde kanaalstatistieken |

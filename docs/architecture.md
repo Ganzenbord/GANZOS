@@ -51,17 +51,20 @@ enkele aanroep.
 ```
 backend/
   app/
+    main.py         create_app(): bouwt de applicatie
+    api/            de eindpunten, plus deps.py (wie ben je, en mag je dit)
+    core/           instellingen, database, beveiliging, rechten
     models/         de tabellen
     schemas/        wat er in en uit de API gaat
     services/       de regels
-    routers/        de eindpunten
     integrations/   de buitenwereld
       base.py       de koppelvlakken waar iedereen zich aan houdt
       finance/      handmatig, crypto-koersen, register
       social/       YouTube, Instagram, TikTok, register
+      voice/        SpeechBrain achter een koppelvlak
       fx.py         wisselkoersen naar euro
-    scheduler/      de achtergrondtaken
-    utils/          geld, tijd, versleuteling
+    workers/        de achtergrondtaken
+    utils/          geld, tijd, versleuteling, audio, afdrukken, pincode-eisen
   alembic/          de migraties
   tests/            de testsuite
   scripts/          gebruiker aanmaken, voorbeelddata
@@ -72,9 +75,63 @@ frontend/
     hooks/          dashboard ophalen, klok, aftellen
     pages/          de schermen
     lib/format.ts   alle opmaak van getallen en tijden
-electron/           de desktopschil
+electron/
+  main.cjs          venster en levensloop
+  backend.cjs       draait er een Ganz op dit adres?
+  settings.cjs      waar die dan draait, bewaard tussen twee keer opstarten
+  preload.cjs       de smalle brug naar het venster
+  offline.html      wat je ziet als de backend er niet is
+  tests/            wat je kunt nalopen zonder scherm
 docs/               deze documentatie
 ```
+
+De frontend haalt zijn gegevens via `/api` op dezelfde host. In de desktopschil kan dat niet
+— die laadt de pagina van schijf (`file://`) en dan wijst een relatief pad nergens heen.
+Electron geeft het adres daarom door via `preload.cjs`, en `client.ts` haalt dat één keer op
+vóór het eerste verzoek. Zie [deployment.md](deployment.md).
+
+## De applicatie wordt gemaakt door een functie
+
+`create_app()` bouwt hem. Wie hem aanroept bepaalt welke instellingen en welke database
+erin gaan; een test geeft zijn eigen database mee en hoeft niets te vervangen wat er al
+staat. De regel `app = create_app()` onderaan `main.py` is er voor `uvicorn app.main:app`
+en legt zelf nog geen verbinding aan — dat gebeurt pas bij het opstarten (de lifespan).
+
+### Geen verbinding in een modulevariabele
+
+Eerder stonden `engine` en `SessionLocal` los in `core/database.py`. Dat werkt, maar dan
+deelt het hele programma één verbinding die al bij het importeren wordt aangelegd: een
+test kan er niet omheen, twee apps naast elkaar zitten elkaar in de weg, en bij het
+afsluiten blijft er van alles openstaan.
+
+Nu is er een `Database`-object. De lifespan zet er één klaar in `app.state`, endpoints
+vragen erom via `Depends(get_session)`, en wie geen verzoek heeft — de scheduler, de
+scripts — krijgt hem meegegeven of maakt zijn eigen met `create_database()`.
+
+## /health zegt pas 'ok' als de database antwoordt
+
+Vroeger gaf `/health` altijd `{"status": "ok"}`, ook met een database die plat lag. Dan
+meldt de monitor dat alles goed gaat terwijl niets werkt. Nu doet het endpoint een
+`SELECT 1` over de sessie die het binnenkrijgt, en geeft het een `503` met
+`status: degraded` als dat niet lukt — geen `500`, want dat is de uitkomst van de
+controle en niet een fout in de app.
+
+Eén valkuil zit daarin vast: een platliggende PostgreSQL komt **niet** als nette
+`SQLAlchemyError` binnen maar als kale `ConnectionRefusedError` uit asyncpg. Vangen op
+`SQLAlchemyError` alleen is dus niet genoeg. `tests/test_health.py` houdt dat vast.
+
+## Stubs met een echt koppelvlak
+
+Twee onderdelen doen nog niet wat ze straks moeten doen, maar zijn wel al zo gebouwd dat de
+echte versie erin past zonder dat de rest verandert:
+
+- **`SpeakerEncoder`** — SpeechBrain, of straks pyannote, of in de tests een namaakversie.
+- **`ToolRegistry` / `SkillExecutor`** — de stappen van een skill worden nagelopen en gelogd,
+  maar er gebeurt nog niets in de buitenwereld. Een echt gereedschap aansluiten is één
+  `register()` erbij; de Task-API verandert er niet van. Zie [skills.md](skills.md).
+
+Dat `simulated: true` staat in elk antwoord. Een stub die zich voordoet als het echte werk is
+erger dan geen stub.
 
 ## Een nieuwe partij toevoegen
 
@@ -94,7 +151,7 @@ staat er `null` en laat de frontend het paneel weg.
 | Rij | Panelen |
 | --- | --- |
 | 1 | Core overzicht · Ganz Circle · Live intelligence feed |
-| 2 | **To do list** · Mission/Tasks · Quick commands |
+| 2 | Actieve skills · Vandaag · **To do list** · Mission/Tasks · Quick commands |
 | 3 | **Finance** · **Social media stats** · LLM status · **Channel upload schedule** |
 | 4 | System monitor · Memory insights |
 
@@ -105,3 +162,35 @@ wanneer gaat de volgende upload eruit.
 In de Ganz Circle staat uitsluitend het woord GANZ. Geen versienummer, geen CPU, geen
 status: die horen in de panelen eromheen. De ring beweegt alleen als Ganz daadwerkelijk
 luistert of iets uitvoert.
+
+## Op een telefoon
+
+Het is dezelfde React-app; er is geen aparte mobiele versie die je twee keer moet
+bijhouden. Onder 768 pixels verandert alleen de indeling:
+
+- de zijbalk verdwijnt en er komt een balk onderaan met **Center · To do · Taken · Geld ·
+  Meer**. Vier vaste plekken, want meer knoppen worden op 375 pixels te smal om raak te
+  tikken. Alles wat niet op de balk past zit achter **Meer** — dat is geen restbak maar de
+  volledige lijst, dus niets is op een telefoon onvindbaar;
+- de panelen komen onder elkaar in de volgorde waarin je ze onderweg nodig hebt: eerst wat
+  er te doen staat, dan het geld, de kanalen en de uploads. Die volgorde staat in
+  `theme.css` als `order` per `data-panel`.
+
+**Let op bij een nieuw paneel:** een paneel zonder regel in dat blok krijgt `order: 0` en
+springt daarmee vóór álles, ook vóór het kernoverzicht. Dat is een keer echt gebeurd met twee
+nieuwe panelen. Geef een nieuw paneel dus meteen een plek in die lijst.
+
+Getest op 375 × 812 (telefoon) en 1440 × 900 (laptop), met een echte browser: geen
+horizontaal schuiven, zijbalk alleen op de laptop, onderbalk alleen op de telefoon.
+
+### Waarom de pincode op een telefoon voorop staat
+
+Bevestigen kan met je wachtwoord of met je pincode. Op een telefoon staat de pincode
+vooraan, omdat een heel wachtwoord op een klein toetsenbord intikken je verleidt tot een
+kórter wachtwoord — precies het omgekeerde van wat je wilt. Het tabblad Pincode verschijnt
+alleen als er ook echt een pincode is; dat vraagt de app op bij `/api/auth/me` (`has_pin`).
+Instellen doe je bij **Instellingen**.
+
+Inloggen blijft e-mailadres plus wachtwoord. Je stem is op een telefoon met opzet niet de
+manier om binnen te komen: een opname is zo gemaakt, en de microfoon van een telefoon staat
+zelden in een rustige kamer.

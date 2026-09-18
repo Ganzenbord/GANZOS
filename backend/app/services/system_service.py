@@ -38,7 +38,14 @@ def record_sample() -> dict[str, Any]:
     return reading
 
 
-def snapshot() -> dict[str, Any]:
+def snapshot(*, detailed: bool = True) -> dict[str, Any]:
+    """De toestand van de machine.
+
+    Zonder `detailed` alleen het stoplicht: draait alles nog, ja of nee. De cijfers zelf
+    (belasting, schijfruimte, hoe lang de machine al aanstaat) zeggen meer over de computer
+    dan over Ganz en zijn alleen voor tier 1. Zonder dit onderscheid zou de tier-1-eis op
+    /system/metrics niets voorstellen: dezelfde getallen stonden dan gewoon in /system.
+    """
     current = record_sample()
     warnings = [
         name
@@ -49,12 +56,18 @@ def snapshot() -> dict[str, Any]:
         )
         if value >= 90
     ]
-    return {
-        **current,
+    status = {
         "status": "warning" if warnings else "optimal",
         "status_detail": (
             f"Hoge belasting: {', '.join(warnings)}" if warnings else "Alles optimaal"
         ),
+        "measured_at": current["measured_at"],
+    }
+    if not detailed:
+        return status
+    return {
+        **current,
+        **status,
         "history": list(_history),
         "boot_time": datetime.fromtimestamp(psutil.boot_time()).astimezone(),
     }

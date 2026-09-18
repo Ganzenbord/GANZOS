@@ -1,0 +1,27 @@
+# systemd-unit voor Ganz. Docker Compose doet het werk; systemd zorgt dat het na een
+# herstart van de machine vanzelf weer draait.
+#
+# Installeren:
+#   sudo cp deploy/ganz.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ganz
+
+[Unit]
+Description=Ganz Command Center
+Requires=docker.service
+After=docker.service network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/ganz/deploy
+# De sleutels staan in één bestand met rechten 0600, eigendom van root. Nooit in de
+# repository, nooit in het image, nooit in een omgevingsvariabele van je shell.
+EnvironmentFile=/etc/ganz/ganz.env
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+ExecReload=/usr/bin/docker compose up -d --build
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

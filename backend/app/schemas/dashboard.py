@@ -54,11 +54,22 @@ class SystemSample(BaseModel):
     measured_at: UtcDatetime
 
 
-class SystemOut(SystemSample):
+class SystemOut(BaseModel):
+    """Het systeempaneel.
+
+    Het stoplicht is er altijd; de cijfers alleen voor wie `system.admin` heeft (tier 1).
+    Vandaar dat alles behalve status optioneel is — dat is geen slordigheid maar de vorm van
+    het antwoord voor een lagere tier.
+    """
+
     status: str
     status_detail: str
-    history: list[SystemSample]
-    boot_time: UtcDatetime
+    measured_at: UtcDatetime
+    cpu_pct: float | None = None
+    ram_pct: float | None = None
+    disk_pct: float | None = None
+    history: list[SystemSample] | None = None
+    boot_time: UtcDatetime | None = None
 
 
 class MemoryInsightsOut(BaseModel):

@@ -11,11 +11,13 @@ import { SocialStatsPanel } from '../components/panels/SocialStatsPanel'
 import { UploadSchedulePanel } from '../components/panels/UploadSchedulePanel'
 import { SystemMonitor } from '../components/panels/SystemMonitor'
 import { LlmStatusPanel, MemoryInsights } from '../components/panels/SmallPanels'
+import { ActiveSkills } from '../components/panels/ActiveSkills'
+import { TodayTasks } from '../components/panels/TodayTasks'
 
 /** De indeling van het command center.
  *
  *  Rij 1: wie ben ik en wat gebeurt er.
- *  Rij 2: wat moet ik vandaag doen.
+ *  Rij 2: wat kan ik, wat staat er vandaag, en wat moet ik nog doen.
  *  Rij 3: hoeveel heb ik, hoe doen de kanalen het, wanneer gaat de volgende eruit.
  *  Rij 4: hoe staat de machine ervoor.
  *
@@ -40,6 +42,8 @@ export function DashboardPage({
       </div>
 
       <div className="row row--work">
+        {can('skills.read') ? <ActiveSkills onOpenAll={() => navigate('/skills')} /> : null}
+        {can('tasks.read') ? <TodayTasks onOpenAll={() => navigate('/tasks')} /> : null}
         {data.todo ? (
           <TodoPanel
             todo={data.todo}

@@ -1,0 +1,80 @@
+# Ganz op één machine: database, backend, en Caddy ervoor.
+#
+# Draaien:  docker compose --env-file /etc/ganz/ganz.env up -d
+# Bijwerken: zie docs/server.md — eerst de migraties, dan de nieuwe versie.
+
+# Zonder dit heet het geheel naar de map waarin het staat ("deploy"), en dat zegt niets in
+# `docker compose ls`.
+name: ganz
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ganz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?zet POSTGRES_PASSWORD in /etc/ganz/ganz.env}
+      POSTGRES_DB: ganz
+    volumes:
+      - ganz-db:/var/lib/postgresql/data
+    # Geen ports: naar buiten. De database is alleen bereikbaar voor de backend hiernaast;
+    # een opengezette 5432 is de kortste weg naar al je gegevens.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ganz -d ganz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GANZ_ENVIRONMENT: production
+      GANZ_DATABASE_URL: postgresql+asyncpg://ganz:${POSTGRES_PASSWORD}@db:5432/ganz
+      GANZ_SECRET_KEY: ${GANZ_SECRET_KEY:?zet GANZ_SECRET_KEY in /etc/ganz/ganz.env}
+      GANZ_ENCRYPTION_KEY: ${GANZ_ENCRYPTION_KEY:?zet GANZ_ENCRYPTION_KEY in /etc/ganz/ganz.env}
+      GANZ_CORS_ORIGINS: ${GANZ_CORS_ORIGINS:-}
+      GANZ_YOUTUBE_CLIENT_ID: ${GANZ_YOUTUBE_CLIENT_ID:-}
+      GANZ_YOUTUBE_CLIENT_SECRET: ${GANZ_YOUTUBE_CLIENT_SECRET:-}
+      GANZ_YOUTUBE_REDIRECT_URI: ${GANZ_YOUTUBE_REDIRECT_URI:-}
+      GANZ_YOUTUBE_VIDEO_DIR: /videos
+    volumes:
+      # De map met video's. Read-only: Ganz publiceert wat erin staat, en hoeft er niets
+      # bij te zetten of weg te gooien.
+      - ${GANZ_VIDEO_DIR:?zet GANZ_VIDEO_DIR in /etc/ganz/ganz.env}:/videos:ro
+      - ganz-modellen:/home/ganz/.cache
+    expose:
+      - "8000"
+    # Migraties draaien met opzet niet vanzelf bij het starten. Een migratie die je niet zelf
+    # aanzet, draait ook als je alleen maar de machine herstart — en dan verandert je
+    # database op een moment dat je er niet naar kijkt. De opdracht staat in docs/server.md:
+    #   docker compose run --rm api alembic upgrade head
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    # Alleen luisteren op het adres van Tailscale. Zonder dit staat Ganz ook op je gewone
+    # netwerkkaart, en daarmee op internet als de machine een publiek adres heeft.
+    ports:
+      - "${GANZ_BIND_ADDRESS:?zet GANZ_BIND_ADDRESS in /etc/ganz/ganz.env}:443:443"
+    environment:
+      GANZ_HOSTNAME: ${GANZ_HOSTNAME:?zet GANZ_HOSTNAME in /etc/ganz/ganz.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Het gebouwde scherm: één map met bestanden, geen eigen proces.
+      - ../frontend/dist:/srv/ganz:ro
+      # Het certificaat van Tailscale, met `tailscale cert` gemaakt. Zie docs/server.md.
+      - ${GANZ_CERT_DIR:?zet GANZ_CERT_DIR in /etc/ganz/ganz.env}:/certs:ro
+      - caddy-data:/data
+
+volumes:
+  ganz-db:
+  ganz-modellen:
+  caddy-data:

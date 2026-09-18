@@ -2,7 +2,7 @@
    Bedragen komen binnen als tekst, niet als getal: een float zou bij optellen centen
    laten verdwijnen. Rekenen doet de backend; hier tonen we alleen. */
 
-export type Tier = 1 | 2 | 3 | 4
+export type Tier = 1 | 2 | 3 | 4 | null;  // null = wel bekend, geen toegang
 
 export interface Subtask {
   id: number
@@ -211,4 +211,126 @@ export interface Integration {
   status: string
   status_detail: string | null
   last_checked_at: string | null
+  /** Óf er een sleutel is ingevuld. Nooit welke — die komt niet van de server af. */
+  has_credentials: boolean
+}
+
+
+/* --- Skills en taken (fase 3) --------------------------------------------- */
+
+export interface SkillStep {
+  tool: string
+  action?: string | null
+  [key: string]: unknown
+}
+
+export interface Skill {
+  id: number
+  name: string
+  description: string | null
+  category: string | null
+  enabled: boolean
+  trigger_pattern: string | null
+  steps: SkillStep[]
+  required_permission: string | null
+  run_count: number
+  success_count: number
+  failure_count: number
+  version: number
+  last_used_at: string | null
+}
+
+export interface Tool {
+  name: string
+  description: string
+  sensitive: boolean
+  /** Zolang dit waar is heeft Ganz de stap nagelopen maar niets in de buitenwereld gedaan. */
+  simulated: boolean
+}
+
+export interface Task {
+  id: number
+  title: string
+  description: string | null
+  status: string
+  skill_id: number | null
+  match_confidence: number | null
+  /** Waarom deze skill gekozen is, of waarom geen enkele. */
+  match_reason: string | null
+  result: Record<string, unknown>
+  error: string | null
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+}
+
+export interface MatchResult {
+  matched: boolean
+  confidence: number
+  threshold: number
+  reason: string
+  backend: string
+  skill: Skill | null
+  task: Task
+}
+
+/* --- Het Command Center (fase 4) ------------------------------------------ */
+
+export interface ScheduleItem {
+  kind: 'upload' | 'task'
+  id: number
+  title: string
+  at: string
+  status: string
+  done: boolean
+}
+
+export interface ScheduleToday {
+  day: string
+  items: ScheduleItem[]
+  total: number
+  open: number
+}
+
+export interface MemoryOverview {
+  memory_count: number
+  session_count: number
+  activity_count: number
+  recent_activity: { id: number; action: string; message: string | null; created_at: string }[]
+}
+
+/** Wat `/auth/me` teruggeeft. `has_pin` zegt alleen dát er een pincode is. */
+export interface Me {
+  id: number
+  email: string
+  display_name: string
+  tier: Tier
+  permissions: string[]
+  has_pin: boolean
+}
+
+/** De stand van de YouTube-koppeling. Bevat met opzet geen enkel token. */
+export interface YouTubeStatus {
+  configured: boolean
+  connected: boolean
+  can_upload: boolean
+  channel_name: string | null
+  channel_id: string | null
+  channel_status: string | null
+  upload_privacy: string
+  video_dir: string | null
+  redirect_uri: string
+  explanation: string
+}
+
+/** Eén ingelogd apparaat. Bevat met opzet geen enkel token. */
+export interface Device {
+  id: number
+  device_name: string | null
+  user_agent: string | null
+  ip_address: string | null
+  created_at: string
+  last_used_at: string | null
+  expires_at: string
+  current: boolean
 }

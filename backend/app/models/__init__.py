@@ -1,7 +1,14 @@
 """Alle tabellen op één plek, zodat Alembic ze allemaal ziet."""
 
+from app.models.access import UserPermission, UserSession
 from app.models.activity import ActivityAction, ActivityLogEntry
-from app.models.base import Base, TimestampMixin, utcnow
+from app.models.base import Base, TimestampMixin, UtcDateTime, utcnow
+from app.models.confirmation import (
+    MAX_ATTEMPTS,
+    ConfirmationMethod,
+    ConfirmationRequest,
+    ConfirmationStatus,
+)
 from app.models.finance import (
     AccountStatus,
     AccountType,
@@ -41,7 +48,17 @@ from app.models.upload import (
     UploadSchedule,
     UploadStatus,
 )
-from app.models.user import TIER_GUEST, TIER_LIMITED, TIER_OWNER, TIER_TRUSTED, User
+from app.models.user import (
+    TIER_GUEST,
+    TIER_LIMITED,
+    TIER_NONE,
+    TIER_OWNER,
+    TIER_TRUSTED,
+    TIERS,
+    User,
+)
+from app.models.video import Video, VideoStatus
+from app.models.voice import VoiceProfile
 
 __all__ = [
     "AccountStatus",
@@ -50,6 +67,9 @@ __all__ = [
     "ActivityLogEntry",
     "Base",
     "ChannelStatus",
+    "ConfirmationMethod",
+    "ConfirmationRequest",
+    "ConfirmationStatus",
     "ContentType",
     "Conversation",
     "ConversationMessage",
@@ -58,6 +78,7 @@ __all__ = [
     "Integration",
     "IntegrationStatus",
     "LlmProviderStatus",
+    "MAX_ATTEMPTS",
     "MemoryEntry",
     "MissionStatus",
     "MissionTask",
@@ -66,11 +87,14 @@ __all__ = [
     "SocialChannel",
     "SocialChannelStats",
     "SocialPlatform",
+    "TIERS",
     "TIER_GUEST",
     "TIER_LIMITED",
     "TIER_OWNER",
+    "TIER_NONE",
     "TIER_TRUSTED",
     "TimestampMixin",
+    "UtcDateTime",
     "TodoCompletion",
     "TodoPriority",
     "TodoRecurrence",
@@ -81,6 +105,11 @@ __all__ = [
     "UploadSchedule",
     "UploadStatus",
     "User",
+    "UserPermission",
+    "UserSession",
+    "Video",
+    "VideoStatus",
+    "VoiceProfile",
     "Workflow",
     "utcnow",
 ]

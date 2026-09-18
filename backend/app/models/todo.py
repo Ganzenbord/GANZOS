@@ -14,7 +14,6 @@ from enum import StrEnum
 from sqlalchemy import (
     Boolean,
     Date,
-    DateTime,
     ForeignKey,
     Integer,
     String,
@@ -23,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin, UtcDateTime
 
 
 class TodoPriority(StrEnum):
@@ -100,7 +99,7 @@ class TodoCompletion(Base):
     )
     date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
     completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
     task: Mapped[TodoTask] = relationship(back_populates="completions")
 
@@ -119,4 +118,4 @@ class TodoSubtaskCompletion(Base):
     )
     date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
     completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)

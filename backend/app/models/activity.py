@@ -10,10 +10,10 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, utcnow
+from app.models.base import Base, UtcDateTime, utcnow
 
 
 class ActivityAction(StrEnum):
@@ -46,7 +46,39 @@ class ActivityAction(StrEnum):
     UPLOAD_FAILED = "UPLOAD_FAILED"
 
     USER_LOGGED_IN = "USER_LOGGED_IN"
+    USER_LOGGED_OUT = "USER_LOGGED_OUT"
+    SESSION_REVOKED = "SESSION_REVOKED"
+    SESSION_REUSE_DETECTED = "SESSION_REUSE_DETECTED"
+    USER_PASSWORD_CHANGED = "USER_PASSWORD_CHANGED"
+
+    INTEGRATION_CONNECTED = "INTEGRATION_CONNECTED"
+    INTEGRATION_UPDATED = "INTEGRATION_UPDATED"
+    INTEGRATION_REMOVED = "INTEGRATION_REMOVED"
     USER_CONFIRMED = "USER_CONFIRMED"
+    USER_PIN_SET = "USER_PIN_SET"
+
+    VOICE_ENROLLED = "VOICE_ENROLLED"
+    VOICE_IDENTIFIED = "VOICE_IDENTIFIED"
+    VOICE_UNKNOWN = "VOICE_UNKNOWN"
+    VOICE_PROFILE_REMOVED = "VOICE_PROFILE_REMOVED"
+
+    SKILL_CREATED = "SKILL_CREATED"
+    SKILL_UPDATED = "SKILL_UPDATED"
+    SKILL_DELETED = "SKILL_DELETED"
+
+    TASK_CREATED = "TASK_CREATED"
+    TASK_MATCHED = "TASK_MATCHED"
+    TASK_UNMATCHED = "TASK_UNMATCHED"
+    TASK_COMPLETED = "TASK_COMPLETED"
+    TASK_FAILED = "TASK_FAILED"
+    TASK_CANCELLED = "TASK_CANCELLED"
+
+    YOUTUBE_CONNECTED = "YOUTUBE_CONNECTED"
+    YOUTUBE_DISCONNECTED = "YOUTUBE_DISCONNECTED"
+    YOUTUBE_TOKEN_REFRESHED = "YOUTUBE_TOKEN_REFRESHED"
+    YOUTUBE_UPLOAD_STARTED = "YOUTUBE_UPLOAD_STARTED"
+    YOUTUBE_UPLOAD_COMPLETED = "YOUTUBE_UPLOAD_COMPLETED"
+    YOUTUBE_UPLOAD_FAILED = "YOUTUBE_UPLOAD_FAILED"
 
 
 class ActivityLogEntry(Base):
@@ -62,5 +94,5 @@ class ActivityLogEntry(Base):
     message: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     context: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), index=True
+        UtcDateTime, default=utcnow, server_default=func.now(), index=True
     )

@@ -17,8 +17,8 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.config import get_settings
-from app.database import SessionLocal
+from app.core.config import get_settings
+from app.core.database import create_database
 from app.models.finance import AccountStatus, AccountType, FinancialAccount
 from app.models.platform import Integration, IntegrationStatus, MemoryEntry, Skill
 from app.models.social import ChannelStatus, SocialChannel, SocialChannelStats
@@ -38,7 +38,8 @@ async def seed(email: str) -> None:
         )
 
     now = datetime.now(timezone.utc)
-    async with SessionLocal() as session:
+    database = create_database()
+    async with database.session() as session:
         user = await session.scalar(select(User).where(User.email == email.lower()))
         if user is None:
             raise SystemExit(f"Geen gebruiker met {email}. Maak er eerst een met create_user.")
@@ -92,9 +93,14 @@ async def seed(email: str) -> None:
             ("instagram", "Instagram Reels", 4832, 500_000, 15_000, timedelta(hours=2, minutes=4)),
             ("tiktok", "TikTok Kanaal 1", 1589, 340_000, 3_921, timedelta(minutes=28)),
         ]:
+            # Met opzet niet "gekoppeld": er zitten geen sleutels achter. Zou hier
+            # CONNECTED staan, dan zegt de kanalenlijst dat YouTube gekoppeld is terwijl de
+            # koppelkaart ernaast zegt van niet — en dan geloof je geen van beide.
             channel = SocialChannel(
                 user_id=user.id, platform=platform, channel_name=DEMO + name,
-                status=ChannelStatus.CONNECTED, last_synced_at=now,
+                status=ChannelStatus.NOT_CONFIGURED,
+                status_detail="Voorbeeldkanaal uit de demodata; er zit geen koppeling achter.",
+                last_synced_at=now,
             )
             session.add(channel)
             await session.flush()

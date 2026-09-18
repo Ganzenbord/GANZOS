@@ -17,10 +17,12 @@ from typing import Any, Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.integrations.base import (
     ProviderAuthError,
     ProviderError,
     ProviderNotConfigured,
+    RefreshableProvider,
 )
 from app.integrations.social.registry import get_social_provider
 from app.models.activity import ActivityAction
@@ -267,6 +269,7 @@ async def sync_channel(session: AsyncSession, channel: SocialChannel) -> SocialC
 
     credentials = get_vault().decrypt(channel.credentials_encrypted)
     try:
+        credentials = await _refreshed(session, channel, provider, credentials)
         stats = await provider.get_stats(credentials)
         revenue = await provider.get_revenue(credentials)
     except ProviderNotConfigured as exc:
@@ -303,6 +306,29 @@ async def sync_channel(session: AsyncSession, channel: SocialChannel) -> SocialC
     channel.last_synced_at = utcnow()
     await session.flush()
     return channel
+
+
+async def _refreshed(
+    session: AsyncSession,
+    provider_channel: SocialChannel,
+    provider: object,
+    credentials: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Vernieuwt de toegang als de partij dat kent en het nodig is.
+
+    Niet elke partij werkt zo — een API-sleutel verloopt niet — dus dit is een vraag aan de
+    provider en geen aanname over allemaal. De vernieuwde gegevens gaan meteen versleuteld
+    terug de database in; anders vraagt elke synchronisatie een nieuw token aan.
+    """
+    if not isinstance(provider, RefreshableProvider):
+        return credentials
+    marge = get_settings().youtube_token_margin_seconds
+    if not provider.needs_refresh(credentials, marge):
+        return credentials
+    vernieuwd = await provider.refresh_credentials(credentials)
+    provider_channel.credentials_encrypted = get_vault().encrypt(vernieuwd)
+    await session.flush()
+    return vernieuwd
 
 
 async def _log_sync_failure(session: AsyncSession, channel: SocialChannel, detail: str) -> None:

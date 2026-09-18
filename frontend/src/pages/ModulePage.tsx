@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, ApiError } from '../api/client'
 import { relativeSince, shortDateTime } from '../lib/format'
 import { Panel } from '../components/ui/Panel'
@@ -19,6 +19,8 @@ interface ModulePageProps {
   emptyHint?: string
   /** Sommige eindpunten leveren een object met de lijst erin. */
   pick?: (payload: unknown) => Record<string, unknown>[]
+  /** Een paneel dat bóven de tabel hoort, zoals het instellen van een pincode. */
+  intro?: ReactNode
 }
 
 function render(value: unknown, kind?: Column['kind']) {
@@ -42,6 +44,7 @@ export function ModulePage({
   emptyTitle,
   emptyHint,
   pick,
+  intro,
 }: ModulePageProps) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -66,6 +69,7 @@ export function ModulePage({
 
   return (
     <div className="page">
+      {intro}
       <Panel title={title} meta={loading ? 'Laden…' : `${rows.length} regels`}>
         {error ? <div className="notice notice--error">{error}</div> : null}
         {!error && rows.length === 0 && !loading ? (

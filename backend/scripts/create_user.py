@@ -16,26 +16,30 @@ import sys
 
 from sqlalchemy import select
 
-from app.database import SessionLocal
+from app.core.database import create_database
 from app.models.user import User
-from app.security import hash_password
+from app.core.security import hash_password
 
 
 async def create(email: str, name: str, tier: int, password: str) -> None:
-    async with SessionLocal() as session:
-        existing = await session.scalar(select(User).where(User.email == email.lower()))
-        if existing is not None:
-            print(f"Er bestaat al een gebruiker met {email}.")
-            return
-        session.add(
-            User(
-                email=email.lower(),
-                display_name=name,
-                password_hash=hash_password(password),
-                tier=tier,
+    database = create_database()
+    try:
+        async with database.session() as session:
+            existing = await session.scalar(select(User).where(User.email == email.lower()))
+            if existing is not None:
+                print(f"Er bestaat al een gebruiker met {email}.")
+                return
+            session.add(
+                User(
+                    email=email.lower(),
+                    display_name=name,
+                    password_hash=hash_password(password),
+                    tier=tier,
+                )
             )
-        )
-        await session.commit()
+            await session.commit()
+    finally:
+        await database.dispose()
     print(f"Gebruiker {email} aangemaakt met tier {tier}.")
 
 
