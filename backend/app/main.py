@@ -27,6 +27,7 @@ from app.api import (
     todos,
     uploads,
     voice,
+    youtube,
 )
 from app.core.config import Settings, get_settings
 from app.core.database import Database, create_database
@@ -54,6 +55,7 @@ API_MODULES = (
     voice,
     skills,
     status,
+    youtube,
 )
 
 

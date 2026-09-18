@@ -93,9 +93,14 @@ async def seed(email: str) -> None:
             ("instagram", "Instagram Reels", 4832, 500_000, 15_000, timedelta(hours=2, minutes=4)),
             ("tiktok", "TikTok Kanaal 1", 1589, 340_000, 3_921, timedelta(minutes=28)),
         ]:
+            # Met opzet niet "gekoppeld": er zitten geen sleutels achter. Zou hier
+            # CONNECTED staan, dan zegt de kanalenlijst dat YouTube gekoppeld is terwijl de
+            # koppelkaart ernaast zegt van niet — en dan geloof je geen van beide.
             channel = SocialChannel(
                 user_id=user.id, platform=platform, channel_name=DEMO + name,
-                status=ChannelStatus.CONNECTED, last_synced_at=now,
+                status=ChannelStatus.NOT_CONFIGURED,
+                status_detail="Voorbeeldkanaal uit de demodata; er zit geen koppeling achter.",
+                last_synced_at=now,
             )
             session.add(channel)
             await session.flush()

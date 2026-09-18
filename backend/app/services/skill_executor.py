@@ -23,7 +23,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover - alleen voor de typecontrole
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("ganz.skills")
 
@@ -41,10 +44,19 @@ class StepContext:
     skill_name: str
     step_index: int
     confirmed: bool
+    # De lopende databasesessie. Gesimuleerd gereedschap heeft hem niet nodig; echt
+    # gereedschap wel, want dat moet een koppeling opzoeken en zijn werk vastleggen. Hij
+    # staat hier en niet in de constructor van de uitvoerder: een sessie hoort bij één
+    # verzoek, de uitvoerder gaat de hele looptijd van Ganz mee.
+    session: "AsyncSession | None" = None
 
 
 # Een gereedschap krijgt de stap en de context, en geeft terug wat het deed.
 ToolCallable = Callable[[dict[str, Any], StepContext], Awaitable[dict[str, Any]]]
+
+# Kijkt of de stap de gegevens bevat die dit gereedschap nodig heeft, en gooit anders een
+# StepError. Draait bij het opslaan van een skill, dus lang voor het uitvoeren.
+StepCheck = Callable[[dict[str, Any]], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +70,9 @@ class Tool:
     # Zolang dit True is, doet het gereedschap alsof. Gaat per gereedschap uit zodra de
     # echte koppeling er staat — niet in één keer voor alles.
     simulated: bool = True
+    # Controleert of een stap compleet is. Zonder dit merk je pas tijdens het uitvoeren dat
+    # er een titel ontbreekt, en dan staat de taak al op "bezig".
+    check: StepCheck | None = None
 
 
 class ToolRegistry:
@@ -106,8 +121,75 @@ async def _simulate(step: dict[str, Any], context: StepContext) -> dict[str, Any
     }
 
 
+def _check_youtube_upload(step: dict[str, Any]) -> None:
+    """Een uploadstap zonder bestand of titel is geen uploadstap.
+
+    Dit draait al bij het opslaan van de skill. Zou het pas bij het uitvoeren gebeuren, dan
+    ontdek je de ontbrekende titel nadat je hebt bevestigd dat er gepubliceerd mag worden.
+    """
+    if not str(step.get("file") or "").strip():
+        raise StepError("noemt geen bestand ('file')")
+    if not str(step.get("title") or "").strip():
+        raise StepError("noemt geen titel ('title')")
+    tags = step.get("tags")
+    if tags is not None and not isinstance(tags, list):
+        raise StepError("'tags' moet een lijst zijn")
+    privacy = step.get("privacy")
+    if privacy is not None and privacy not in {"private", "unlisted", "public"}:
+        raise StepError("'privacy' kan alleen private, unlisted of public zijn")
+
+
+async def _youtube_upload(step: dict[str, Any], context: StepContext) -> dict[str, Any]:
+    """Publiceert echt een video. Het eerste gereedschap dat niet doet alsof.
+
+    Wat een stap meegeeft: `file` (een bestandsnaam in de ingestelde videomap), `title`, en
+    optioneel `description`, `tags` en `privacy`. Het pad wordt niet hier maar in
+    `youtube_service` nagelopen — daar staat ook waarom dat niet zomaar elk pad mag zijn.
+    """
+    # Binnen de functie: zo hangt het opstarten van Ganz niet aan de YouTube-koppeling, en
+    # blijft dit bestand leesbaar als lijst van wat Ganz kan.
+    from app.services import youtube_service
+
+    if context.session is None:  # pragma: no cover - alleen bij verkeerd gebruik
+        raise StepError(
+            "Deze stap heeft een databasesessie nodig en kreeg er geen. Dit is een fout in "
+            "Ganz zelf, niet in je skill."
+        )
+
+    _check_youtube_upload(step)
+    bestand = str(step["file"]).strip()
+    titel = str(step["title"]).strip()
+
+    rauwe_tags = step.get("tags") or []
+    tags = [str(t) for t in rauwe_tags] if isinstance(rauwe_tags, list) else []
+
+    try:
+        video = await youtube_service.upload(
+            context.session,
+            context.user_id,
+            file_name=bestand,
+            title=titel,
+            description=str(step.get("description") or ""),
+            tags=tags,
+            privacy=step.get("privacy"),
+        )
+    except youtube_service.YouTubeError as exc:
+        raise StepError(exc.message) from exc
+
+    return {
+        "simulated": False,
+        "video_id": video.external_id,
+        "url": video.url,
+        "privacy": video.privacy,
+    }
+
+
 def default_registry() -> ToolRegistry:
-    """De gereedschappen die Ganz kent. Allemaal nog gesimuleerd.
+    """De gereedschappen die Ganz kent.
+
+    Alles is nog gesimuleerd behalve `youtube.upload`: die publiceert echt. Dat staat per
+    gereedschap aan en niet in één keer voor alles — een gereedschap gaat pas van "doet
+    alsof" naar "doet het" als de koppeling eronder er echt is.
 
     De namen komen overeen met de rechten uit `app/core/permissions.py` waar die bestaan,
     zodat een skill die `youtube.upload` gebruikt ook het recht `upload.execute` nodig heeft.
@@ -122,7 +204,14 @@ def default_registry() -> ToolRegistry:
             Tool("mail.read", "Binnengekomen mail lezen", _simulate),
             Tool("mail.send", "Mail versturen", _simulate, sensitive=True),
             Tool("smart_home.control", "Lampen en apparaten bedienen", _simulate),
-            Tool("youtube.upload", "Een video publiceren naar YouTube", _simulate, sensitive=True),
+            Tool(
+                "youtube.upload",
+                "Een video publiceren naar YouTube",
+                _youtube_upload,
+                sensitive=True,
+                simulated=False,
+                check=_check_youtube_upload,
+            ),
             Tool("finance.read", "Het financieel overzicht opvragen", _simulate),
         ]
     )
@@ -158,7 +247,12 @@ class SkillExecutor:
             naam = stap.get("tool")
             if not naam:
                 raise StepError(f"Stap {nummer} noemt geen gereedschap ('tool').")
-            self._registry.get(str(naam))
+            tool = self._registry.get(str(naam))
+            if tool.check is not None:
+                try:
+                    tool.check(stap)
+                except StepError as exc:
+                    raise StepError(f"Stap {nummer} ({tool.name}): {exc}") from exc
 
     def sensitive_tools(self, steps: list[dict[str, Any]]) -> list[str]:
         """Welke stappen om een bevestiging vragen."""
@@ -186,6 +280,7 @@ class SkillExecutor:
                 skill_name=context.skill_name,
                 step_index=nummer,
                 confirmed=context.confirmed,
+                session=context.session,
             )
 
             if tool.sensitive and not context.confirmed:

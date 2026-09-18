@@ -69,16 +69,16 @@ deze waarde.
 Te laag → Ganz pakt de verkeerde skill. Te hoog → hij zegt steeds dat hij het niet kan. Het
 eerste is vervelender, dus begin liever te streng.
 
-## Uitvoeren: nu nog een stub, maar met het juiste koppelvlak
+## Uitvoeren: één gereedschap doet het echt, de rest doet nog alsof
 
-De stappen worden nagelopen, gecontroleerd en gelogd — er gebeurt nog **niets** in de
-buitenwereld. Dat staat in elk antwoord (`"simulated": true`) en per gereedschap
-(`GET /api/skills/tools`).
+Of een stap echt iets uitricht staat per gereedschap in het antwoord (`"simulated"`) en in
+`GET /api/skills/tools`. Sinds fase 7 staat `youtube.upload` op `false`: die publiceert
+werkelijk. De rest loopt nog na, controleert en logt, maar doet niets in de buitenwereld.
 
-Dat is met opzet zo. Een halve upload is erger dan geen upload. Wat nu al goed staat is het
-koppelvlak: een gereedschap is een naam plus een functie, en die gaan in een `ToolRegistry`.
-Straks een echte YouTube-upload aansluiten is één `register()` erbij — de Task-API, de
-statussen en de manier waarop resultaten worden opgeslagen veranderen daar niet van.
+Dat het per gereedschap gaat en niet in één klap voor alles, is het punt. Een halve upload
+is erger dan geen upload; een gereedschap gaat pas van "doet alsof" naar "doet het" als de
+koppeling eronder er echt is. Het koppelvlak is daar niet voor veranderd — een gereedschap
+is een naam plus een functie in een `ToolRegistry`, en dat was het al:
 
 ```python
 registry.register(Tool(
@@ -87,10 +87,11 @@ registry.register(Tool(
     echte_upload_functie,
     sensitive=True,
     simulated=False,
+    check=controleer_de_stap,
 ))
 ```
 
-Drie dingen die het koppelvlak nu al afdwingt, omdat ze later niet meer in te bouwen zijn
+Vier dingen die het koppelvlak afdwingt, omdat ze later niet meer in te bouwen zijn
 zonder alles om te gooien:
 
 1. **Een stap met een onbekend gereedschap laat de hele taak falen vóór er iets gebeurt.**
@@ -101,12 +102,20 @@ zonder alles om te gooien:
 3. **De uitvoering stopt bij de eerste fout en draait niets terug.** Wat wél gelukt is staat
    in het resultaat, zodat je weet waar je moet kijken. Terugdraaien kan pas zinnig als de
    gereedschappen echt iets doen en zelf weten hoe ze dat ongedaan maken.
+4. **Een gereedschap mag zeggen wat een stap moet bevatten** (`check`). Dat draait bij het
+   opslaan van de skill. Zonder dat merk je pas tijdens het uitvoeren dat de titel ontbrak —
+   nadat je hebt bevestigd dat er gepubliceerd mag worden.
 
 ### De gereedschappen nu
 
-`activity.log`, `todo.create`, `weather.read`, `calendar.read`, `mail.read`,
-`smart_home.control`, `finance.read`, en als gevoelig: `mail.send`, `youtube.upload`.
-Allemaal nog gesimuleerd.
+| Gereedschap | Gevoelig | Doet het echt |
+| --- | --- | --- |
+| `youtube.upload` | ja | **ja** — zie [youtube.md](youtube.md) |
+| `mail.send` | ja | nee |
+| `activity.log`, `todo.create`, `weather.read`, `calendar.read`, `mail.read`, `smart_home.control`, `finance.read` | nee | nee |
+
+Een `youtube.upload`-stap heeft `file` en `title` nodig; `description`, `tags` en `privacy`
+mogen. Ontbreekt er een van de eerste twee, dan wordt de skill niet opgeslagen.
 
 ## Rechten en bevestiging
 
@@ -155,10 +164,11 @@ hetzelfde; hernoemen zou de bestaande tijdlijn breken zonder dat er iets voor te
 
 ## Wat er nog niet is
 
-- **Geen enkel gereedschap doet echt iets.** Dat is fase 7 (YouTube) en verder.
+- **Alleen `youtube.upload` doet echt iets.** De rest is nog een oefening; dat staat per
+  gereedschap in `GET /api/skills/tools`.
 - **Geen automatische koppeling van opdracht naar uitvoering.** Je matcht en voert los uit.
-  Dat is bewust: zolang de executor een stub is, is een knop per stap duidelijker dan een
-  ketting die vanzelf doorloopt.
+  Dat is bewust: nu er een stap tussen zit die echt publiceert, is een knop per stap
+  duidelijker dan een ketting die vanzelf doorloopt.
 - **Geen terugdraaien.** Zie hierboven.
 - **De drempel is nooit met echte opdrachten getest.** Reken erop dat hij bijgesteld moet
   worden, zeker als je het taalmodel aanzet.

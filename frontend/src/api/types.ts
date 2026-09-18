@@ -306,3 +306,17 @@ export interface Me {
   permissions: string[]
   has_pin: boolean
 }
+
+/** De stand van de YouTube-koppeling. Bevat met opzet geen enkel token. */
+export interface YouTubeStatus {
+  configured: boolean
+  connected: boolean
+  can_upload: boolean
+  channel_name: string | null
+  channel_id: string | null
+  channel_status: string | null
+  upload_privacy: string
+  video_dir: string | null
+  redirect_uri: string
+  explanation: string
+}

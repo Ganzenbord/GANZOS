@@ -97,6 +97,28 @@ class Settings(BaseSettings):
     # voor beide manieren van matchen, en die tellen niet hetzelfde — zie docs/skills.md.
     skill_match_threshold: float = 0.45
 
+    # --- YouTube ------------------------------------------------------------
+    # Uit een eigen Google Cloud-project. Zonder deze twee is koppelen niet mogelijk; Ganz
+    # zegt dat dan met zoveel woorden in plaats van een half werkende knop te tonen.
+    youtube_client_id: str | None = None
+    youtube_client_secret: str | None = None
+    # Waar Google je na het toestemming geven weer afzet. Dit adres moet lettergelijk ook in
+    # de Google Cloud-console staan, anders weigert Google de koppeling.
+    youtube_redirect_uri: str = "http://localhost:8000/api/youtube/oauth/callback"
+
+    # Waar een geüploade video op komt te staan. Met opzet `private`: een verkeerde upload
+    # die meteen openbaar is, is niet meer terug te nemen — mensen hebben hem dan al gezien.
+    youtube_upload_privacy: Literal["private", "unlisted", "public"] = "private"
+
+    # De map waar je video's staan. Leeg betekent: uploaden is uit. Een skill mag daarmee
+    # nooit een willekeurig bestand van de computer naar YouTube sturen; alleen wat hierin
+    # staat komt in aanmerking.
+    youtube_video_dir: str | None = None
+
+    # Hoeveel seconden voor het verlopen van een token Ganz hem alvast vernieuwt. Zonder
+    # marge verloopt hij precies tijdens een upload van tien minuten.
+    youtube_token_margin_seconds: int = 120
+
     # Seed-data is uitsluitend voor development; zie scripts/seed.py.
     allow_seed_data: bool = False
 

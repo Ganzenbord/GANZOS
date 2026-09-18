@@ -69,6 +69,26 @@ class Revenue:
     period_end: datetime | None = None
 
 
+@dataclass(slots=True)
+class VideoUpload:
+    """Wat er nodig is om een video te publiceren."""
+
+    file_path: str
+    title: str
+    description: str = ""
+    tags: list[str] = field(default_factory=list)
+    # "private", "unlisted" of "public". De aanroeper bepaalt dit niet zelf uit het niets:
+    # de standaard komt uit de instellingen.
+    privacy: str = "private"
+
+
+@dataclass(slots=True)
+class UploadedVideo:
+    external_id: str
+    url: str
+    privacy: str
+
+
 @runtime_checkable
 class FinanceProvider(Protocol):
     key: str
@@ -97,3 +117,28 @@ class SocialProvider(Protocol):
     ) -> list[ContentItem]: ...
 
     async def get_revenue(self, credentials: dict[str, Any] | None) -> Revenue | None: ...
+
+
+@runtime_checkable
+class RefreshableProvider(Protocol):
+    """Een partij waarvan de toegang verloopt en te vernieuwen is.
+
+    Los van `SocialProvider`, want lang niet elke partij werkt zo: een API-sleutel verloopt
+    niet. Wie dit wél kan, geeft de vernieuwde gegevens terug zodat de aanroeper ze kan
+    opslaan — een provider praat zelf niet met de database.
+    """
+
+    def needs_refresh(self, credentials: dict[str, Any] | None, margin_seconds: int) -> bool: ...
+
+    async def refresh_credentials(
+        self, credentials: dict[str, Any] | None
+    ) -> dict[str, Any]: ...
+
+
+@runtime_checkable
+class VideoPublisher(Protocol):
+    """Een partij waar een video naartoe kan."""
+
+    async def upload_video(
+        self, credentials: dict[str, Any] | None, video: VideoUpload
+    ) -> UploadedVideo: ...

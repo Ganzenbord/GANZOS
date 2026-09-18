@@ -70,6 +70,24 @@ Het bewaarde adres staat in `settings.json` in de gebruikersmap van het besturin
 `~/.config/Ganz`). Eén regel tekst, met opzet: als de app niet meer opstart moet je hem met
 de hand kunnen aanpassen.
 
+## Hoe het eruitziet
+
+De schil zelf is op alle drie de systemen hetzelfde programma; alleen het venster eromheen
+komt van het besturingssysteem — op Windows een strakke balk met een kruisje rechts, op macOS
+drie rondjes links. Wat erin staat is identiek:
+
+![De desktopschil met het command center](afbeeldingen/desktop-app.png)
+
+Draait er geen backend, dan komt er geen leeg venster maar dit:
+
+![De uitlegpagina als de backend niet draait](afbeeldingen/desktop-offline.png)
+
+En dezelfde Ganz op een telefoon:
+
+| Het dashboard | Achter "Meer" |
+| --- | --- |
+| ![Ganz op een telefoon](afbeeldingen/telefoon-dashboard.png) | ![Het menu Meer](afbeeldingen/telefoon-meer.png) |
+
 ## Een installeerbaar programma bouwen
 
 ```bash
@@ -80,6 +98,11 @@ npm run app:build:linux    # Linux (AppImage en deb)
 ```
 
 Het resultaat komt in `dist/` (de electron-builder-map, niet `frontend/dist`).
+
+**Bouw voor Windows op Windows en voor macOS op een Mac.** Dat is geen aanbeveling maar
+praktijk: `npm run app:build:win` op Linux maakt wel een werkende `Ganz.exe`, maar loopt
+daarna vast op het ondertekenen (`wine is required`), en `--mac` heeft de gereedschappen van
+macOS zelf nodig. Op het systeem waar je voor bouwt is `npm run app:build` genoeg.
 
 Deze builds zijn **niet ondertekend**. Zonder certificaat waarschuwt macOS (Gatekeeper) en
 Windows (SmartScreen) bij het openen dat de maker onbekend is. Voor eigen gebruik kun je dat

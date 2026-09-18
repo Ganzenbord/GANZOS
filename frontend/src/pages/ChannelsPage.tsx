@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, ApiError } from '../api/client'
 import type { ScheduleOverview, SocialChannel, SocialOverview, Upload } from '../api/types'
 import {
@@ -35,7 +35,14 @@ function Countdown({ upload, offset }: { upload: Upload; offset: number }) {
 
 /** Kanalen beheren, statistieken bekijken en uploads inplannen.
  *  Bereikbaar via /social en /youtube; /youtube filtert op dat ene platform. */
-export function ChannelsPage({ platform }: { platform?: string }) {
+export function ChannelsPage({
+  platform,
+  intro,
+}: {
+  platform?: string
+  /** Een paneel dat bóven de kanalen hoort, zoals de YouTube-koppeling. */
+  intro?: ReactNode
+}) {
   const [channels, setChannels] = useState<SocialChannel[]>([])
   const [overview, setOverview] = useState<SocialOverview | null>(null)
   const [schedule, setSchedule] = useState<ScheduleOverview | null>(null)
@@ -161,6 +168,7 @@ export function ChannelsPage({ platform }: { platform?: string }) {
   return (
     <div className="page">
       {error ? <div className="notice notice--error">{error}</div> : null}
+      {intro}
 
       {overview && !platform ? (
         <Panel

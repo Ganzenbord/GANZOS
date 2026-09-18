@@ -198,9 +198,15 @@ In elk antwoord staat welke van de twee gebruikt is (`"backend": "woorden"` of
 > **Let op:** de twee tellen niet hetzelfde. Zet je het model aan, kijk dan opnieuw naar
 > `GANZ_SKILL_MATCH_THRESHOLD`. Zie [docs/skills.md](docs/skills.md).
 
-De stappen van een skill worden op dit moment **nagelopen en gelogd, maar niet echt
-uitgevoerd** — dat staat ook in elk antwoord (`"simulated": true`). Het koppelvlak eronder is
-wel al af, dus een echte YouTube-upload aansluiten is later één regel.
+Van de stappen van een skill doet er sinds fase 7 één écht iets: `youtube.upload`
+publiceert werkelijk een video. De rest wordt nagelopen en gelogd, maar doet nog niets in de
+buitenwereld. Per gereedschap staat dat in het antwoord (`"simulated"`) en in
+`GET /api/skills/tools` — met opzet per gereedschap, want een gereedschap gaat pas van "doet
+alsof" naar "doet het" als de koppeling eronder er echt is.
+
+Voor het uploaden is een koppeling met YouTube nodig. Zie
+[docs/youtube.md](docs/youtube.md); reken op een kwartier eenmalig geklik in de Google
+Cloud-console, dat valt niet te omzeilen.
 
 ---
 
@@ -220,6 +226,10 @@ lijst met uitleg.
 | `GANZ_CONFIRMATION_MAX_FAILURES` | `5` | zoveel mispogingen en het slot gaat erop |
 | `GANZ_CONFIRMATION_LOCKOUT_MINUTES` | `15` | hoe lang dat slot erop blijft |
 | `GANZ_CORS_ORIGINS` | `http://localhost:5173` | waar de frontend vandaan mag komen |
+| `GANZ_YOUTUBE_CLIENT_ID` | leeg | uit je eigen Google Cloud-project |
+| `GANZ_YOUTUBE_CLIENT_SECRET` | leeg | idem |
+| `GANZ_YOUTUBE_UPLOAD_PRIVACY` | `private` | waar een upload op komt te staan |
+| `GANZ_YOUTUBE_VIDEO_DIR` | leeg | de map met je video's; leeg = uploaden uit |
 | `GANZ_SCHEDULER_ENABLED` | `true` | achtergrondsynchronisatie aan of uit |
 | `GANZ_FINANCE_SYNC_MINUTES` | `15` | hoe vaak financiële accounts worden opgehaald |
 | `GANZ_SOCIAL_SYNC_MINUTES` | `30` | hoe vaak social-kanalen worden opgehaald |
@@ -275,6 +285,7 @@ paneel met uitleg, geen voorbeeldbedrag.
 | [docs/security.md](docs/security.md) | tiers, bevestiging, sleutels |
 | [docs/voice.md](docs/voice.md) | stemherkenning en wat een stem wel en niet opent |
 | [docs/skills.md](docs/skills.md) | skills, taken, matchen en uitvoeren |
+| [docs/youtube.md](docs/youtube.md) | koppelen met YouTube, en echt uploaden |
 | [docs/deployment.md](docs/deployment.md) | draaien, de desktopschil, en installers bouwen |
 | [docs/todos.md](docs/todos.md) | de dagelijkse takenlijst |
 | [docs/finance.md](docs/finance.md) | vermogen, valuta, providers |

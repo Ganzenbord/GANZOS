@@ -12,6 +12,7 @@ import { ModulePage } from './pages/ModulePage'
 import { SkillsPage } from './pages/SkillsPage'
 import { TasksPage } from './pages/TasksPage'
 import { PinCard } from './components/panels/PinCard'
+import { YouTubeCard } from './components/panels/YouTubeCard'
 import { Panel } from './components/ui/Panel'
 
 // Electron laadt de bestanden van schijf; daar werkt alleen een hash-router.
@@ -105,7 +106,11 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
           <Route
             path="/youtube"
             element={
-              can('social.read') ? <ChannelsPage platform="youtube" /> : <Navigate to="/" replace />
+              can('social.read') ? (
+                <ChannelsPage platform="youtube" intro={<YouTubeCard />} />
+              ) : (
+                <Navigate to="/" replace />
+              )
             }
           />
           <Route

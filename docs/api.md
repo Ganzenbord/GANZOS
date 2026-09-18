@@ -85,6 +85,20 @@ Gevoelige handelingen vragen naast het inlogtoken ook een bevestigingstoken in d
 header `X-Ganz-Confirmation`. Ontbreekt die, dan antwoordt de API met **428** en de
 melding dat je eerst moet bevestigen. Zie `docs/security.md`.
 
+## YouTube
+
+| Methode | Pad | Wat het doet |
+| --- | --- | --- |
+| GET | `/youtube/status` | staat de koppeling, en zo niet: wat ontbreekt er |
+| POST | `/youtube/connect` | geeft het adres waar je bij Google toestemming geeft |
+| GET | `/youtube/oauth/callback` | hier zet Google je neer; geen JSON maar een pagina |
+| POST | `/youtube/disconnect` | gooit de tokens weg, houdt het kanaal |
+
+Koppelen en losmaken zijn gevoelige handelingen: ze vragen een bevestigingstoken. De
+terugkeerpagina juist niet — die wordt door Google aangeroepen en heeft dus geen
+inlogtoken; wat daarvoor in de plaats komt is een ondertekende `state`. Zie
+[youtube.md](youtube.md).
+
 ## Dashboard
 
 | Methode | Pad | Wat het doet |

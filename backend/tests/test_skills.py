@@ -24,7 +24,12 @@ UPLOAD_SKILL = {
     "description": "Een afgeronde video publiceren naar YouTube",
     "trigger_pattern": "upload|publiceer|zet online",
     "steps": [
-        {"tool": "youtube.upload", "action": "upload"},
+        {
+            "tool": "youtube.upload",
+            "action": "upload",
+            "file": "aflevering-12.mp4",
+            "title": "Aflevering 12",
+        },
         {"tool": "activity.log", "action": "success"},
     ],
 }
@@ -135,13 +140,28 @@ async def test_de_stappen_worden_op_volgorde_gedaan() -> None:
 
 async def test_gevoelig_gereedschap_weigert_zonder_bevestiging() -> None:
     uitkomst = await SkillExecutor().run(
-        [{"tool": "youtube.upload"}],
+        [{"tool": "youtube.upload", "file": "video.mp4", "title": "Aflevering 12"}],
         StepContext(user_id=1, task_id=1, skill_name="Test", step_index=0, confirmed=False),
     )
 
     assert uitkomst.ok is False
     assert "bevestiging" in uitkomst.error
     assert uitkomst.failed_step == 1
+
+
+async def test_een_onvolledige_uploadstap_komt_niet_eens_op_gang() -> None:
+    """Een stap die geen bestand noemt hoort te stranden vóór het uitvoeren, niet erna.
+
+    Anders bevestig je eerst dat er gepubliceerd mag worden en hoor je daarna pas dat de
+    titel ontbrak — met een taak die dan al op 'bezig' staat."""
+    uitkomst = await SkillExecutor().run(
+        [{"tool": "youtube.upload", "title": "Zonder bestand"}],
+        StepContext(user_id=1, task_id=1, skill_name="Test", step_index=0, confirmed=True),
+    )
+
+    assert uitkomst.ok is False
+    assert "file" in uitkomst.error
+    assert uitkomst.steps == []
 
 
 async def test_de_uitvoering_stopt_bij_de_eerste_fout() -> None:
@@ -188,7 +208,9 @@ def test_er_kunnen_echte_gereedschappen_bij_zonder_de_rest_te_veranderen() -> No
     """Dit is waar het koppelvlak voor bedoeld is: één register() erbij, verder niets."""
     register = SkillExecutor().registry
     assert "youtube.upload" in register
-    assert register.get("youtube.upload").simulated is True
+    # Per gereedschap, niet in één keer voor alles: de YouTube-upload is echt, de rest nog niet.
+    assert register.get("youtube.upload").simulated is False
+    assert register.get("weather.read").simulated is True
 
     register.register(Tool("eigen.iets", "Zelf toegevoegd", lambda s, c: _ok()))
     assert "eigen.iets" in register
@@ -213,6 +235,19 @@ async def test_een_skill_met_een_onbekend_gereedschap_wordt_niet_opgeslagen(
     assert "Onbekend gereedschap" in antwoord.json()["detail"]
 
 
+async def test_een_skill_met_een_onvolledige_uploadstap_wordt_niet_opgeslagen(
+    client: AsyncClient, owner: User
+) -> None:
+    antwoord = await client.post(
+        "/skills",
+        json={"name": "Half", "steps": [{"tool": "youtube.upload", "title": "Geen bestand"}]},
+        headers=auth_headers(owner),
+    )
+
+    assert antwoord.status_code == 422
+    assert "file" in antwoord.json()["detail"]
+
+
 async def test_de_lijst_met_gereedschappen_zegt_wat_echt_is(
     client: AsyncClient, owner: User
 ) -> None:
@@ -221,8 +256,9 @@ async def test_de_lijst_met_gereedschappen_zegt_wat_echt_is(
 
     assert per_naam["youtube.upload"]["sensitive"] is True
     assert per_naam["weather.read"]["sensitive"] is False
-    # Zolang dit true is heeft Ganz niets in de buitenwereld gedaan. Dat hoort zichtbaar te zijn.
-    assert all(rij["simulated"] for rij in rijen)
+    # Wat er echt gebeurt en wat nog een oefening is, hoort per gereedschap zichtbaar te zijn.
+    assert per_naam["youtube.upload"]["simulated"] is False
+    assert all(rij["simulated"] for rij in rijen if rij["name"] != "youtube.upload")
 
 
 async def test_de_hele_loop_van_opdracht_tot_uitgevoerd(
@@ -292,7 +328,13 @@ async def test_een_gevoelige_skill_vraagt_om_een_bevestiging(
     headers = await confirm_headers(session, owner, "tasks.execute")
     met = await client.post(f"/tasks/{taak['id']}/execute", headers=headers)
     assert met.status_code == 200, met.text
-    assert met.json()["ok"] is True
+
+    # Voorbij de bevestiging, en dan stopt hij op het enige dat er echt aan ontbreekt. Dat
+    # de stap hier niet slaagt is het punt: er is geen YouTube-koppeling, dus er gaat ook
+    # niets de deur uit.
+    lichaam = met.json()
+    assert lichaam["ok"] is False
+    assert "koppel" in lichaam["error"].lower()
 
 
 async def test_een_mislukte_uitvoering_telt_mee_als_mislukking(

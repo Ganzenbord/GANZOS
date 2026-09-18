@@ -13,7 +13,7 @@ from app.core.config import get_settings
 # pbkdf2_sha256 is pure Python: geen losse bcrypt-versie die bij een upgrade breekt.
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-TokenPurpose = Literal["access", "confirmation"]
+TokenPurpose = Literal["access", "confirmation", "youtube_oauth"]
 # Waar een aanmelding vandaan komt. Een stem is na te maken, een wachtwoord niet zomaar.
 TokenOrigin = Literal["password", "voice"]
 ALGORITHM = "HS256"
@@ -39,11 +39,14 @@ def create_token(
     gevoelige handelingen moet je kunnen zien waar de aanmelding vandaan kwam.
     """
     settings = get_settings()
-    minutes = (
-        settings.access_token_minutes
-        if purpose == "access"
-        else settings.confirmation_token_minutes
-    )
+    # Per soort token een eigen levensduur. Het toestemmingsverkeer met Google krijgt er
+    # ruimer de tijd voor dan een bevestiging: je moet er een account kiezen en een scherm
+    # met rechten doorlezen, en dat duurt langer dan het intikken van een pincode.
+    minutes = {
+        "access": settings.access_token_minutes,
+        "confirmation": settings.confirmation_token_minutes,
+        "youtube_oauth": 15,
+    }[purpose]
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(subject),

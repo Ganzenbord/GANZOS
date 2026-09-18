@@ -156,6 +156,7 @@ async def execute_task(
             skill_name=skill.name,
             step_index=0,
             confirmed=confirmed,
+            session=session,
         ),
     )
 
@@ -165,7 +166,12 @@ async def execute_task(
     if uitkomst.ok:
         task.status = MissionStatus.DONE
         task.completed_at = _now()
-        task.result = {"steps": uitkomst.steps, "simulated": True}
+        # "Is dit echt gebeurd?" is geen eigenschap van de taak maar van de stappen. Zolang
+        # het één vaste True was, meldde Ganz een echte upload als een oefening.
+        task.result = {
+            "steps": uitkomst.steps,
+            "simulated": all(stap.get("simulated", True) for stap in uitkomst.steps),
+        }
         skill.success_count += 1
     else:
         # Wachten op een bevestiging is geen mislukking: de taak blijft staan tot iemand

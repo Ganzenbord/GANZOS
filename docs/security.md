@@ -111,6 +111,25 @@ Een inlogtoken kan nooit als bevestiging dienen: er zit een `purpose` in het tok
 die wordt gecontroleerd. Anders zou de extra drempel een formaliteit zijn — en zou wie
 even een openstaande laptop tegenkomt je rekeningen kunnen loskoppelen.
 
+## De YouTube-koppeling
+
+Drie dingen die hier anders liggen dan bij de rest van de API, en waarom:
+
+- **De terugkeerpagina `/api/youtube/oauth/callback` heeft geen inlogcontrole.** Google roept
+  hem aan, niet de app, dus er is geen `Authorization`-header. Wat daarvoor in de plaats komt
+  is de `state`: een door Ganz ondertekend token (`purpose: youtube_oauth`) dat zegt van wie
+  het verzoek kwam en dat na een kwartier vervalt. Zonder geldige state gebeurt er niets, en
+  als inlogtoken is hij niet te gebruiken — de `purpose` wordt gecontroleerd.
+- **Ganz vraagt niet meer rechten dan nodig.** Lezen, uploaden en de omzet; bewust géén
+  `youtube.force-ssl`, want die mag ook video's en reacties verwijderen.
+- **Uploaden kan alleen uit één ingestelde map** (`GANZ_YOUTUBE_VIDEO_DIR`), en zonder die
+  instelling staat het uit. Een skill noemt alleen een bestandsnaam; zou elk pad mogen, dan
+  is "upload vakantie.mp4" hetzelfde soort verzoek als "upload ../../.ssh/id_rsa". Het pad
+  wordt uitgerekend en daarna gecontroleerd, dus `..` en een symbolische link naar buiten
+  helpen allebei niet.
+
+Zie [youtube.md](youtube.md) voor het hele verhaal.
+
 ## Sleutels en tokens
 
 - Tokens van banken, exchanges en platforms staan **versleuteld** in de database
