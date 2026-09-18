@@ -457,9 +457,41 @@ input, select, textarea { font: inherit; }
 .login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
 .login__card { width: 100%; max-width: 360px; }
 
-/* ---------- Onderbalk (mobiel) ---------- */
+/* ---------- Bevestigingsvenster ---------- */
 
+.modal {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center;
+  padding: 16px;
+  background: rgba(4, 7, 12, 0.72);
+}
+.modal__panel { width: 100%; max-width: 360px; }
+.modal__intro { margin: 0 0 12px; font-size: 13px; color: var(--text-muted); }
+.modal__buttons { display: flex; gap: 8px; }
+.modal__go { flex: 1; }
+
+/* Twee knoppen die samen één keuze zijn: pincode of wachtwoord. */
+.switch {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  background: var(--bg);
+}
+.switch__item {
+  border: none; background: none; color: var(--text-muted);
+  border-radius: calc(var(--radius-sm) - 2px);
+  padding: 7px 10px; font-size: 12.5px;
+}
+.switch__item:hover { color: var(--text); }
+.switch__item--active { background: var(--bg-elevated); color: var(--amber); font-weight: 600; }
+
+/* ---------- Onderbalk en "Meer"-menu (mobiel) ---------- */
+
+/* Allebei alleen op een smal scherm. Zonder deze regel blijft het menu staan als je op een
+   laptop het venster van smal naar breed sleept met het menu open. */
 .bottomnav { display: none; }
+.sheet { display: none; }
 
 /* ---------- Responsief ---------- */
 
@@ -482,19 +514,25 @@ input, select, textarea { font: inherit; }
   .row { display: contents; }
 
   /* De volgorde waarin je het onderweg nodig hebt: eerst wat er te doen staat,
-     dan het geld, de kanalen en de uploads. De rest komt daarna. */
+     dan het geld, de kanalen en de uploads. De rest komt daarna.
+
+     Let op: een paneel zonder regel hier krijgt order 0 en springt dus vóór alles.
+     Dat gebeurde ook echt — twee nieuwe panelen stonden ineens boven het
+     kernoverzicht. Een nieuw paneel hoort hier een plek te krijgen. */
   [data-panel='core'] { order: 1; }
   [data-panel='circle'] { order: 2; }
-  [data-panel='todo'] { order: 3; }
-  [data-panel='feed'] { order: 4; }
-  [data-panel='finance'] { order: 5; }
-  [data-panel='social'] { order: 6; }
-  [data-panel='uploads'] { order: 7; }
-  [data-panel='quick'] { order: 8; }
-  [data-panel='missions'] { order: 9; }
-  [data-panel='llm'] { order: 10; }
-  [data-panel='system'] { order: 11; }
-  [data-panel='memory'] { order: 12; }
+  [data-panel='vandaag'] { order: 3; }
+  [data-panel='todo'] { order: 4; }
+  [data-panel='feed'] { order: 5; }
+  [data-panel='finance'] { order: 6; }
+  [data-panel='social'] { order: 7; }
+  [data-panel='uploads'] { order: 8; }
+  [data-panel='quick'] { order: 9; }
+  [data-panel='missions'] { order: 10; }
+  [data-panel='skills'] { order: 11; }
+  [data-panel='llm'] { order: 12; }
+  [data-panel='system'] { order: 13; }
+  [data-panel='memory'] { order: 14; }
   .panel { margin-bottom: var(--gap); }
   .topbar { padding: 0 16px; gap: 10px; }
   .topbar__clock { display: none; }
@@ -502,7 +540,9 @@ input, select, textarea { font: inherit; }
 
   .bottomnav {
     display: flex;
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    /* Boven het "Meer"-menu (40), onder het bevestigingsvenster (60): met het menu open
+       blijft de balk zichtbaar, zodat je met dezelfde knop weer dichtklapt. */
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
     background: var(--bg-elevated);
     border-top: 1px solid var(--border);
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
@@ -513,6 +553,46 @@ input, select, textarea { font: inherit; }
     background: none; border: none;
   }
   .bottomnav__item--active { color: var(--amber); }
+
+  /* "Meer": alles wat niet op de onderbalk past, maar wel bereikbaar moet blijven. */
+  .sheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; }
+  .sheet__backdrop {
+    position: absolute; inset: 0; border: none; padding: 0;
+    background: rgba(4, 7, 12, 0.72);
+  }
+  .sheet__panel {
+    position: relative;
+    width: 100%;
+    max-height: 72vh;
+    overflow-y: auto;
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    padding: 16px 14px calc(78px + env(safe-area-inset-bottom));
+  }
+  .sheet__title {
+    margin: 0 0 12px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .sheet__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sheet__item {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 14px 6px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: center;
+    line-height: 1.25;
+  }
+  .sheet__item--active { border-color: var(--amber-dim); color: var(--amber); }
+
+  /* Met een duim tik je minder nauwkeurig dan met een muis. */
+  .switch__item { padding: 10px; font-size: 13px; }
 }
 
 /* ── Lijsten met een regel per ding (skills, taken, gereedschap) ────────────

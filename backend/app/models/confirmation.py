@@ -16,8 +16,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UtcDateTime
 
-# Zoveel mispogingen mag één bevestiging doen. Een pincode van vier cijfers is anders zo
-# doorgeprobeerd; het rekenwerk van de hashing alleen is daarvoor niet genoeg.
+# Zoveel mispogingen mag één bevestiging doen. Dit is de grens binnen één verzoek; wie het
+# doorprobeert loopt eerst tegen de grens per gebruiker aan (zie confirmation_service:
+# `recent_failures`), want elke poging is een nieuw verzoek en dan begint deze teller weer
+# bij nul.
 MAX_ATTEMPTS = 3
 
 

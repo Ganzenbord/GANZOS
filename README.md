@@ -84,6 +84,25 @@ npm run dev
 
 Open http://localhost:5173 en log in.
 
+Dezelfde pagina werkt op je telefoon. Standaard luistert de ontwikkelserver alleen op deze
+computer; wil je hem op je telefoon openen, start hem dan zo:
+
+```bash
+npm run dev:telefoon
+```
+
+In het venster staat dan een adres als `http://192.168.1.50:5173` — dat typ je op je telefoon
+over. Onder 768 pixels verdwijnt de zijbalk en komt er een balk onderaan; alles wat daar niet
+op past zit achter **Meer**. Zie
+[docs/architecture.md](docs/architecture.md#op-een-telefoon).
+
+Doe dit alleen op je eigen netwerk: iedereen die op dat moment op datzelfde wifi zit, kan het
+inlogscherm openen.
+
+Handig voor onderweg: stel bij **Instellingen** een pincode in. Daarmee bevestig je
+gevoelige handelingen zonder je hele wachtwoord op een klein toetsenbord in te tikken.
+Inloggen blijft met je wachtwoord.
+
 ### 4. Desktop-app (optioneel)
 
 ```bash
@@ -198,6 +217,8 @@ lijst met uitleg.
 | `GANZ_ENCRYPTION_KEY` | *ontwikkelwaarde* | versleutelt de provider-tokens |
 | `GANZ_ACCESS_TOKEN_MINUTES` | `720` | hoe lang een sessie geldig is |
 | `GANZ_CONFIRMATION_TOKEN_MINUTES` | `5` | hoe kort een tweede bevestiging meegaat |
+| `GANZ_CONFIRMATION_MAX_FAILURES` | `5` | zoveel mispogingen en het slot gaat erop |
+| `GANZ_CONFIRMATION_LOCKOUT_MINUTES` | `15` | hoe lang dat slot erop blijft |
 | `GANZ_CORS_ORIGINS` | `http://localhost:5173` | waar de frontend vandaan mag komen |
 | `GANZ_SCHEDULER_ENABLED` | `true` | achtergrondsynchronisatie aan of uit |
 | `GANZ_FINANCE_SYNC_MINUTES` | `15` | hoe vaak financiële accounts worden opgehaald |

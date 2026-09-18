@@ -11,6 +11,7 @@ import { ChannelsPage } from './pages/ChannelsPage'
 import { ModulePage } from './pages/ModulePage'
 import { SkillsPage } from './pages/SkillsPage'
 import { TasksPage } from './pages/TasksPage'
+import { PinCard } from './components/panels/PinCard'
 import { Panel } from './components/ui/Panel'
 
 // Electron laadt de bestanden van schijf; daar werkt alleen een hash-router.
@@ -250,6 +251,7 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
               <ModulePage
                 title="Instellingen — rechten"
                 endpoint="/auth/permissions"
+                intro={<PinCard />}
                 columns={[
                   { key: 'key', label: 'Recht' },
                   { key: 'granted', label: 'Jij mag dit' },

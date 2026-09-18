@@ -76,8 +76,9 @@ handelingen: [voice.md](voice.md).
 | Methode | Pad | Wat het doet |
 | --- | --- | --- |
 | POST | `/auth/login` | e-mailadres + wachtwoord → token |
-| POST | `/auth/confirm` | wachtwoord → kortlopend bevestigingstoken |
-| GET | `/auth/me` | wie ben ik en wat mag ik |
+| POST | `/auth/confirm` | wachtwoord óf pincode → kortlopend bevestigingstoken |
+| POST | `/auth/pin` | pincode instellen of wijzigen (je huidige wachtwoord is nodig) |
+| GET | `/auth/me` | wie ben ik, wat mag ik, en of ik een pincode heb (`has_pin`) |
 | GET | `/auth/permissions` | het hele rechtenregister, met per recht of jij het hebt |
 
 Gevoelige handelingen vragen naast het inlogtoken ook een bevestigingstoken in de

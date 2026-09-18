@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -40,6 +41,20 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+async def recent_failures(
+    session: AsyncSession, *, user_id: int, minutes: int
+) -> int:
+    """Hoeveel mispogingen deze gebruiker de afgelopen minuten bij elkaar heeft."""
+    grens = _now() - timedelta(minutes=minutes)
+    resultaat = await session.execute(
+        select(func.coalesce(func.sum(ConfirmationRequest.attempts), 0)).where(
+            ConfirmationRequest.user_id == user_id,
+            ConfirmationRequest.created_at >= grens,
+        )
+    )
+    return int(resultaat.scalar_one())
+
+
 async def create(
     session: AsyncSession,
     *,
@@ -50,6 +65,21 @@ async def create(
     origin: str | None = None,
     origin_confidence: float | None = None,
 ) -> ConfirmationRequest:
+    # Elke poging is een nieuw verzoek, dus de grens per verzoek (MAX_ATTEMPTS) houdt in zijn
+    # eentje niemand tegen: wie mis tikt begint gewoon opnieuw. Daarom telt hier het totaal
+    # over een tijdvenster mee. Zonder dit is een pincode van vier cijfers in tienduizend
+    # verzoeken te raden, en dat is voor een computer geen werk.
+    mis = await recent_failures(
+        session, user_id=user.id, minutes=settings.confirmation_lockout_minutes
+    )
+    if mis >= settings.confirmation_max_failures:
+        raise ConfirmationError(
+            "te_vaak_mis",
+            f"Te vaak mis. Probeer het over {settings.confirmation_lockout_minutes} "
+            "minuten opnieuw.",
+            status_code=429,
+        )
+
     verzoek = ConfirmationRequest(
         user_id=user.id,
         permission_key=permission_key,
@@ -97,7 +127,7 @@ async def verify(
     if verzoek.method == ConfirmationMethod.PIN.value and not user.pin_hash:
         raise ConfirmationError(
             "pin_niet_ingesteld",
-            "Er is nog geen pincode ingesteld. Stel er een in via /auth/pin.",
+            "Er is nog geen pincode ingesteld. Dat doe je bij Instellingen.",
         )
 
     if not afdruk or not verify_password(secret, afdruk):

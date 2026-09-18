@@ -70,3 +70,14 @@ export const IconRefresh = (p: IconProps) =>
   svg(<><path d="M20 11a8 8 0 1 0-1.6 5.4" /><path d="M20 5v6h-6" /></>, p)
 export const IconTrash = (p: IconProps) =>
   svg(<><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" /></>, p)
+
+/** Drie puntjes: alles wat niet op de onderbalk past. */
+export const IconMore = (p: IconProps) =>
+  svg(
+    <>
+      <circle cx="5" cy="12" r="1.4" />
+      <circle cx="12" cy="12" r="1.4" />
+      <circle cx="19" cy="12" r="1.4" />
+    </>,
+    p,
+  )

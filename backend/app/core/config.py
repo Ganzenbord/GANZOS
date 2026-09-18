@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     access_token_minutes: int = 60 * 12
     # Een tweede bevestiging is kort geldig: hij dekt één gevoelige handeling af.
     confirmation_token_minutes: int = 5
+    # Mispogingen tellen over álle bevestigingen samen, niet per poging apart. Elke poging
+    # is namelijk een nieuw verzoek, dus een grens per verzoek houdt niemand tegen die een
+    # pincode van vier cijfers zit door te proberen.
+    confirmation_max_failures: int = 5
+    confirmation_lockout_minutes: int = 15
 
     # Fernet-sleutel waarmee provider-tokens versleuteld in de database staan.
     encryption_key: str = DEV_ENCRYPTION_KEY

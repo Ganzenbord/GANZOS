@@ -153,6 +153,22 @@ async def test_een_pincode_instellen_vraagt_om_het_wachtwoord(
     assert goed.status_code == 200
 
 
+async def test_me_vertelt_of_er_een_pincode_is(client: AsyncClient, owner: User) -> None:
+    """De telefoon moet dit weten: een pincodeveld tonen dat gegarandeerd mislukt is erger
+    dan geen pincodeveld. Wat er teruggaat is alleen `ja` of `nee`, nooit de code zelf."""
+    voor = (await client.get("/auth/me", headers=auth_headers(owner))).json()
+    assert voor["has_pin"] is False
+
+    await client.post(
+        "/auth/pin", json={"password": WACHTWOORD, "pin": "2468"}, headers=auth_headers(owner)
+    )
+
+    na = (await client.get("/auth/me", headers=auth_headers(owner))).json()
+    assert na["has_pin"] is True
+    assert "2468" not in na.values()
+    assert "pin_hash" not in na
+
+
 async def test_de_pincode_staat_niet_leesbaar_in_de_database(
     client: AsyncClient, owner: User, session
 ) -> None:
@@ -202,6 +218,47 @@ async def test_een_pincode_zonder_ingestelde_pincode_wordt_geweigerd(
 
     assert antwoord.status_code == 403
     assert "nog geen pincode" in antwoord.json()["detail"]
+
+
+async def test_doorproberen_van_de_pincode_loopt_vast(client: AsyncClient, owner: User) -> None:
+    """Een pincode van vier cijfers is tienduizend mogelijkheden: zonder een grens over de
+    verzoeken heen is hij door te rekenen. De grens per verzoek helpt daar niet, want elke
+    poging is een nieuw verzoek."""
+    await client.post(
+        "/auth/pin", json={"password": WACHTWOORD, "pin": "2468"}, headers=auth_headers(owner)
+    )
+
+    codes = [
+        (
+            await client.post(
+                "/auth/confirm", json={"pin": "1357"}, headers=auth_headers(owner)
+            )
+        ).status_code
+        for _ in range(6)
+    ]
+
+    assert codes[:5] == [401] * 5
+    assert codes[5] == 429
+
+    # Ook de goede pincode komt er nu niet meer langs: anders was de grens niets waard.
+    geblokkeerd = await client.post(
+        "/auth/confirm", json={"pin": "2468"}, headers=auth_headers(owner)
+    )
+    assert geblokkeerd.status_code == 429
+    assert "opnieuw" in geblokkeerd.json()["detail"]
+
+
+async def test_de_grens_geldt_per_gebruiker(
+    client: AsyncClient, owner: User, trusted: User
+) -> None:
+    """Wie zijn eigen pincode zit mis te tikken, hoort een ander niet buiten te sluiten."""
+    for _ in range(6):
+        await client.post("/auth/confirm", json={"password": "fout"}, headers=auth_headers(owner))
+
+    van_de_ander = await client.post(
+        "/auth/confirm", json={"password": WACHTWOORD}, headers=auth_headers(trusted)
+    )
+    assert van_de_ander.status_code == 200
 
 
 async def test_elke_bevestiging_laat_een_spoor_na(

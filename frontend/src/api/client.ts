@@ -80,6 +80,14 @@ interface Options {
   body?: unknown
   confirm?: boolean
   signal?: AbortSignal
+  /** Houd de sessie in stand bij een 401.
+   *
+   *  Normaal betekent 401 dat het inlogtoken op is, en dan hoor je terug naar het
+   *  inlogscherm. Bij het bevestigen en bij het instellen van een pincode betekent
+   *  hetzelfde nummer iets heel anders: het getikte geheim klopt niet. Zonder dit
+   *  onderscheid word je uitgelogd omdat je je pincode verkeerd intikt — en op een
+   *  telefoon tik je die geheid een keer mis. */
+  keepSession?: boolean
 }
 
 export async function api<T>(path: string, options: Options = {}): Promise<T> {
@@ -96,7 +104,7 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
     signal: options.signal,
   })
 
-  if (response.status === 401) {
+  if (response.status === 401 && !options.keepSession) {
     setToken(null)
     throw new ApiError(401, 'Je sessie is verlopen. Log opnieuw in.')
   }
@@ -124,12 +132,31 @@ export async function login(email: string, password: string) {
 }
 
 export async function confirmWithPassword(password: string) {
+  return confirmWith({ password })
+}
+
+/** Bevestigen met de pincode in plaats van het wachtwoord.
+ *
+ *  Bedoeld voor de telefoon: een heel wachtwoord intikken op een klein toetsenbord nodigt
+ *  uit tot een korter wachtwoord, en dat is het tegenovergestelde van wat je wilt. De
+ *  pincode is een tweede stap boven op het inloggen, geen vervanging ervan. */
+export async function confirmWithPin(pin: string) {
+  return confirmWith({ pin })
+}
+
+async function confirmWith(body: { password?: string; pin?: string }) {
   const result = await api<{ confirmation_token: string }>('/auth/confirm', {
     method: 'POST',
-    body: { password },
+    body,
+    keepSession: true,
   })
   setConfirmationToken(result.confirmation_token)
   return result.confirmation_token
+}
+
+/** Stel een pincode in, of wijzig hem. Je huidige wachtwoord is nodig. */
+export async function setPin(password: string, pin: string) {
+  await api('/auth/pin', { method: 'POST', body: { password, pin }, keepSession: true })
 }
 
 export function logout() {

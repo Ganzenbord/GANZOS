@@ -74,16 +74,16 @@ async def confirm(
     herkomst = getattr(request.state, "token_origin", None)
     zekerheid = getattr(request.state, "token_confidence", None)
 
-    verzoek = await confirmation_service.create(
-        session,
-        user=user,
-        method=methode,
-        settings=settings,
-        permission_key=payload.permission_key,
-        origin=herkomst,
-        origin_confidence=zekerheid,
-    )
     try:
+        verzoek = await confirmation_service.create(
+            session,
+            user=user,
+            method=methode,
+            settings=settings,
+            permission_key=payload.permission_key,
+            origin=herkomst,
+            origin_confidence=zekerheid,
+        )
         await confirmation_service.verify(
             session,
             verzoek=verzoek,
@@ -149,6 +149,7 @@ async def me(user: User = Depends(get_current_user)):
         display_name=user.display_name,
         tier=user.tier,
         permissions=permissions_for_tier(user.tier),
+        has_pin=user.pin_hash is not None,
     )
 
 

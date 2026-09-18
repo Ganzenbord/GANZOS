@@ -72,8 +72,12 @@ waarvoor, of hoe vaak het misging. Met de rij erbij geldt bovendien:
   komt niet nog een keer langs de kassa.
 - **Vul je `permission_key` in, dan geldt de bevestiging alleen daarvoor.** Bevestigen om het
   weer op te vragen en er dan een upload mee doen, kan niet.
-- **Drie mispogingen en het is klaar.** Een pincode van vier cijfers is anders zo
-  doorgeprobeerd; het rekenwerk van de hashing alleen is daarvoor niet genoeg.
+- **Drie mispogingen binnen één bevestiging en die bevestiging is klaar.**
+- **Vijf mispogingen per gebruiker binnen een kwartier en het slot gaat erop** (429), ook
+  voor de juiste pincode. Die tweede grens is de grens die telt: elke poging is namelijk een
+  nieuw verzoek met een eigen teller, dus de eerste houdt in zijn eentje niemand tegen die
+  tienduizend pincodes zit door te rekenen. Instelbaar met
+  `GANZ_CONFIRMATION_MAX_FAILURES` en `GANZ_CONFIRMATION_LOCKOUT_MINUTES`.
 
 ### De pincode
 
@@ -84,6 +88,10 @@ wachtwoorden (pbkdf2_sha256) en staat nooit leesbaar in de database.
 De pincode is bedoeld voor de telefoon en voor bediening met de stem, waar een heel wachtwoord
 intikken onhandig is. Hij vervángt het wachtwoord niet: je kunt hem alleen gebruiken als je al
 ingelogd of herkend bent.
+
+`GET /api/auth/me` geeft `has_pin` terug: alleen of er een pincode is, nooit welke. De app
+gebruikt dat om op een telefoon meteen het pincodeveld te tonen — en om dat veld weg te laten
+als er nog geen pincode is, want een veld dat gegarandeerd mislukt is erger dan geen veld.
 
 ### Een uitzondering: bevestiging per stap, niet per endpoint
 

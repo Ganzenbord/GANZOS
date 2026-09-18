@@ -57,3 +57,6 @@ class UserOut(BaseModel):
     display_name: str
     tier: int | None
     permissions: list[str]
+    # Alleen of er een pincode is, nooit de pincode zelf. De telefoon gebruikt dit om te
+    # kiezen wat hij bij een bevestiging vraagt.
+    has_pin: bool = False

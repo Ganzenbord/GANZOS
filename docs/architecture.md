@@ -151,7 +151,7 @@ staat er `null` en laat de frontend het paneel weg.
 | Rij | Panelen |
 | --- | --- |
 | 1 | Core overzicht · Ganz Circle · Live intelligence feed |
-| 2 | **To do list** · Mission/Tasks · Quick commands |
+| 2 | Actieve skills · Vandaag · **To do list** · Mission/Tasks · Quick commands |
 | 3 | **Finance** · **Social media stats** · LLM status · **Channel upload schedule** |
 | 4 | System monitor · Memory insights |
 
@@ -162,3 +162,35 @@ wanneer gaat de volgende upload eruit.
 In de Ganz Circle staat uitsluitend het woord GANZ. Geen versienummer, geen CPU, geen
 status: die horen in de panelen eromheen. De ring beweegt alleen als Ganz daadwerkelijk
 luistert of iets uitvoert.
+
+## Op een telefoon
+
+Het is dezelfde React-app; er is geen aparte mobiele versie die je twee keer moet
+bijhouden. Onder 768 pixels verandert alleen de indeling:
+
+- de zijbalk verdwijnt en er komt een balk onderaan met **Center · To do · Taken · Geld ·
+  Meer**. Vier vaste plekken, want meer knoppen worden op 375 pixels te smal om raak te
+  tikken. Alles wat niet op de balk past zit achter **Meer** — dat is geen restbak maar de
+  volledige lijst, dus niets is op een telefoon onvindbaar;
+- de panelen komen onder elkaar in de volgorde waarin je ze onderweg nodig hebt: eerst wat
+  er te doen staat, dan het geld, de kanalen en de uploads. Die volgorde staat in
+  `theme.css` als `order` per `data-panel`.
+
+**Let op bij een nieuw paneel:** een paneel zonder regel in dat blok krijgt `order: 0` en
+springt daarmee vóór álles, ook vóór het kernoverzicht. Dat is een keer echt gebeurd met twee
+nieuwe panelen. Geef een nieuw paneel dus meteen een plek in die lijst.
+
+Getest op 375 × 812 (telefoon) en 1440 × 900 (laptop), met een echte browser: geen
+horizontaal schuiven, zijbalk alleen op de laptop, onderbalk alleen op de telefoon.
+
+### Waarom de pincode op een telefoon voorop staat
+
+Bevestigen kan met je wachtwoord of met je pincode. Op een telefoon staat de pincode
+vooraan, omdat een heel wachtwoord op een klein toetsenbord intikken je verleidt tot een
+kórter wachtwoord — precies het omgekeerde van wat je wilt. Het tabblad Pincode verschijnt
+alleen als er ook echt een pincode is; dat vraagt de app op bij `/api/auth/me` (`has_pin`).
+Instellen doe je bij **Instellingen**.
+
+Inloggen blijft e-mailadres plus wachtwoord. Je stem is op een telefoon met opzet niet de
+manier om binnen te komen: een opname is zo gemaakt, en de microfoon van een telefoon staat
+zelden in een rustige kamer.

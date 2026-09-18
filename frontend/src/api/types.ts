@@ -296,3 +296,13 @@ export interface MemoryOverview {
   activity_count: number
   recent_activity: { id: number; action: string; message: string | null; created_at: string }[]
 }
+
+/** Wat `/auth/me` teruggeeft. `has_pin` zegt alleen dát er een pincode is. */
+export interface Me {
+  id: number
+  email: string
+  display_name: string
+  tier: Tier
+  permissions: string[]
+  has_pin: boolean
+}
