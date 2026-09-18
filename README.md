@@ -37,6 +37,23 @@ in en komen nooit terug op je scherm.
 
 ## Installeren
 
+### Op een Mac: twee keer dubbelklikken
+
+```
+install-ganz.command     ← één keer
+start-ganz.command       ← elke keer dat je Ganz wilt gebruiken
+```
+
+Het eerste bestand zet alles klaar: Python, Node, PostgreSQL, de database, je sleutels en je
+eigen account. Het tweede start Ganz en opent je browser. Zolang dat venster openstaat draait
+Ganz; sluit je het, dan stopt hij.
+
+> Zegt macOS *"kan niet worden geopend omdat de ontwikkelaar niet kan worden geverifieerd"*?
+> Klik het bestand met de **rechtermuisknop** aan, kies **Open**, en dan nogmaals **Open**.
+> Dat hoeft maar één keer per bestand.
+
+Wil je het met de hand doen, of zit je op Windows of Linux, lees dan verder.
+
 ### 1. Database
 
 ```bash

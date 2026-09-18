@@ -7,6 +7,26 @@ desktopschil die dat scherm in een venster zet. Ze weten van elkaar via één ad
 > één machine zetten waar jij en je broer van buitenaf bij kunnen — met Tailscale, Caddy en
 > Docker — lees dan [server.md](server.md).
 
+## In één keer, op een Mac
+
+```
+start-ganz.command
+```
+
+Dubbelklikken. Hij kijkt of PostgreSQL draait, werkt de database bij waar nodig, start de
+backend en het scherm, en opent je browser. Het venster open laten staan: Ctrl-C of het
+venster sluiten stopt allebei de onderdelen weer.
+
+Twee dingen die daarin zitten en die je met de hand makkelijk vergeet:
+
+- **Migraties draaien eerst.** Na een update staan die klaar, en zonder draait de backend
+  tegen een database die niet meer klopt.
+- **Stoppen stopt ook de kinderen.** De onderdelen krijgen elk hun eigen procesgroep, want
+  een programma start zelf weer processen — dood je alleen de ouder, dan blijft poort 5173
+  bezet terwijl je denkt dat Ganz uit staat.
+
+Hieronder staat wat het met de hand betekent, voor als je er middenin wilt werken.
+
 ## De backend
 
 ```bash
