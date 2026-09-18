@@ -23,6 +23,10 @@ jobs:
   bouwen:
     name: ${{ matrix.naam }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      # Zonder dit mag de opdracht wel bouwen maar niets onder Releases zetten, en dat merk
+      # je pas als de laatste stap struikelt.
+      contents: write
     strategy:
       # Gaat er één stuk, dan wil je de andere nog steeds hebben.
       fail-fast: false
