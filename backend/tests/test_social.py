@@ -16,7 +16,7 @@ from app.integrations.base import (
 from app.integrations.social.registry import register_social_provider
 from app.models.social import ChannelStatus, SocialChannelStats
 from app.services import social_service
-from tests.conftest import auth_headers
+from tests.conftest import auth_headers, confirm_headers
 
 
 class FakeSocial:
@@ -195,12 +195,12 @@ async def test_channels_of_other_users_are_invisible(client, owner, trusted, ses
     assert listing.json() == []
 
 
-async def test_managing_channels_needs_confirmation(client, trusted):
+async def test_managing_channels_needs_confirmation(client, trusted, session):
     payload = {"platform": "youtube", "channel_name": "Nieuw kanaal"}
     without = await client.post("/social/channels", json=payload, headers=auth_headers(trusted))
     assert without.status_code == 428
     ok = await client.post(
-        "/social/channels", json=payload, headers=auth_headers(trusted, confirm=True)
+        "/social/channels", json=payload, headers=await confirm_headers(session, trusted)
     )
     assert ok.status_code == 201
     # Zonder gegevens is een kanaal niet gekoppeld; dat moet het ook zeggen.

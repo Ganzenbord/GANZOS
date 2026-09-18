@@ -16,6 +16,18 @@ Antwoordt de database niet, dan komt er een `503` met `"status": "degraded"`,
 Alles staat onder `/api`. Inloggen gaat met een bearer-token in de
 `Authorization`-header.
 
+## Stem
+
+| Endpoint | Wat het doet | Nodig |
+| --- | --- | --- |
+| `POST /api/voice/enroll` | een stem inschrijven bij een `user_id` (multipart: `audio`, `user_id`, optioneel `label`) | `voice.enroll` + bevestiging — behalve de allereerste keer |
+| `POST /api/voice/identify` | uitzoeken wiens stem dit is (multipart: `audio`) | niets: dit ís de controle |
+| `GET /api/voice/profiles` | de ingeschreven stemmen | `voice.read` |
+
+`identify` geeft `result: "identified"` met een gewoon inlogtoken, of `result: "unknown"`
+zonder token. Hoe de cijfers te lezen zijn en waarom een stem nooit genoeg is voor gevoelige
+handelingen: [voice.md](voice.md).
+
 ## Inloggen en bevestigen
 
 | Methode | Pad | Wat het doet |

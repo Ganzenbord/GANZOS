@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _TMP_DB = Path(tempfile.mkdtemp(prefix="ganz-test-")) / "test.db"
@@ -25,7 +26,13 @@ from app.core.config import get_settings  # noqa: E402
 from app.core.database import Database  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base, User  # noqa: E402
+from app.models.confirmation import (  # noqa: E402
+    ConfirmationMethod,
+    ConfirmationRequest,
+    ConfirmationStatus,
+)
 from app.models.user import TIER_LIMITED, TIER_OWNER, TIER_TRUSTED  # noqa: E402
+from tests.voicefakes import BROER, BUURVROUW, STEF, FakeEncoder  # noqa: E402
 from app.core.security import create_token, hash_password  # noqa: E402
 
 
@@ -79,9 +86,20 @@ async def limited(session) -> User:
 
 
 @pytest.fixture
-async def app(database):
+def encoder() -> FakeEncoder:
+    """Drie stemmen die de tests kunnen gebruiken; alles daarbuiten is een vreemde."""
+    namaak = FakeEncoder()
+    for marker in (STEF, BROER, BUURVROUW):
+        namaak.teach(marker)
+    return namaak
+
+
+@pytest.fixture
+async def app(database, encoder):
     """De echte app, met de database van de test erin. Niets hoeft te worden vervangen."""
-    application = create_app(settings=get_settings(), database=database)
+    application = create_app(
+        settings=get_settings(), database=database, speaker_encoder=encoder
+    )
     async with application.router.lifespan_context(application):
         yield application
 
@@ -94,7 +112,36 @@ async def client(app):
 
 
 def auth_headers(user: User, confirm: bool = False) -> dict[str, str]:
-    headers = {"Authorization": f"Bearer {create_token(user.id, 'access')}"}
+    """Let op: `confirm=True` kan hier niet meer.
+
+    Een bevestiging is sinds fase 2 een rij in `confirmation_requests`, niet alleen een
+    token — zodat je achteraf kunt zien dát er bevestigd is, en dezelfde bevestiging niet
+    twee keer gebruikt kan worden. Gebruik `await confirm_headers(session, user, key)`.
+    """
     if confirm:
-        headers["X-Ganz-Confirmation"] = create_token(user.id, "confirmation")
+        raise AssertionError(
+            "Gebruik confirm_headers(session, user, permission_key) in plaats van "
+            "auth_headers(..., confirm=True)."
+        )
+    return {"Authorization": f"Bearer {create_token(user.id, 'access', origin='password')}"}
+
+
+async def confirm_headers(
+    session, user: User, permission_key: str | None = None, *, origin: str = "password"
+) -> dict[str, str]:
+    """Een inlogtoken plus een echte, bevestigde ConfirmationRequest."""
+    verzoek = ConfirmationRequest(
+        user_id=user.id,
+        permission_key=permission_key,
+        method=ConfirmationMethod.PASSWORD.value,
+        status=ConfirmationStatus.CONFIRMED.value,
+        origin=origin,
+        origin_confidence=1.0 if origin == "voice" else None,
+        confirmed_at=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    )
+    session.add(verzoek)
+    await session.commit()
+    headers = auth_headers(user)
+    headers["X-Ganz-Confirmation"] = create_token(user.id, "confirmation", cr=verzoek.id)
     return headers

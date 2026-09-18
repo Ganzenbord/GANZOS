@@ -97,6 +97,59 @@ Draait er nog geen backend, dan start Electron hem er zelf bij vanuit
 
 ---
 
+## Stemherkenning (optioneel)
+
+Ganz kan je herkennen aan je stem. Die stap is los, want SpeechBrain brengt torch mee —
+samen ruim een gigabyte. Zonder deze stap draait alles gewoon; alleen de stem-endpoints
+geven dan een nette melding.
+
+```bash
+cd backend
+pip install -r requirements-voice.txt
+```
+
+**1. Neem een fragment op** van een seconde of tien, als WAV:
+
+```bash
+ffmpeg -i opname.m4a -ac 1 -ar 16000 stef.wav
+```
+
+**2. Schrijf je stem in.** De allereerste keer mag dat zonder inloggen — anders kom je er
+nooit in:
+
+```bash
+curl -X POST http://localhost:8000/api/voice/enroll -F user_id=1 -F audio=@stef.wav
+```
+
+Daarna vraagt inschrijven om het recht `voice.enroll` (tier 1) én een tweede bevestiging.
+Zet in je `.env`:
+
+```
+GANZ_VOICE_ENROLLMENT_OPEN_WHEN_EMPTY=false
+```
+
+**3. Laat je herkennen.** Je krijgt een gewoon inlogtoken terug:
+
+```bash
+curl -X POST http://localhost:8000/api/voice/identify -F audio=@opname.wav
+```
+
+Een herkende stem is een aanmelding, **geen bevestiging**: voor alles wat geld kost, naar
+buiten gaat of iets vernietigt, vraagt Ganz er nog een wachtwoord of pincode bovenop — ook
+van jou. En was de herkenning zwak, dan kan er met dat token helemaal niets bevestigd
+worden. Zie [docs/voice.md](docs/voice.md).
+
+Werkt het niet zoals je wilt:
+
+| Wat je ziet | Wat je doet |
+| --- | --- |
+| `503` op de stem-endpoints | `pip install -r backend/requirements-voice.txt` |
+| `"result": "unknown"` terwijl jij het bent | verlaag `GANZ_VOICE_MATCH_THRESHOLD`, bijvoorbeeld naar `0.20` |
+| iemand anders wordt voor jou aangezien | verhoog hem, bijvoorbeeld naar `0.35`. Dit is het ergere geval van de twee |
+| `"strong": false` | de herkenning was te zwak voor gevoelige dingen; log in met je wachtwoord |
+
+---
+
 ## Instellingen
 
 Alles via omgevingsvariabelen in `backend/.env`. Zie `.env.example` voor de volledige
@@ -164,6 +217,7 @@ paneel met uitleg, geen voorbeeldbedrag.
 | [docs/database.md](docs/database.md) | de tabellen en waarom ze zo zijn |
 | [docs/api.md](docs/api.md) | alle eindpunten |
 | [docs/security.md](docs/security.md) | tiers, bevestiging, sleutels |
+| [docs/voice.md](docs/voice.md) | stemherkenning en wat een stem wel en niet opent |
 | [docs/todos.md](docs/todos.md) | de dagelijkse takenlijst |
 | [docs/finance.md](docs/finance.md) | vermogen, valuta, providers |
 | [docs/social.md](docs/social.md) | gecombineerde kanaalstatistieken |

@@ -153,7 +153,9 @@ export function Shell({ data, children }: { data: Dashboard | null; children: Re
               <span className="avatar__badge">
                 {(data?.user.display_name ?? 'G').charAt(0).toUpperCase()}
               </span>
-              {data ? `${data.user.display_name} · Tier ${data.user.tier}` : '—'}
+              {data
+                ? `${data.user.display_name} · ${data.user.tier === null ? 'geen toegang' : `Tier ${data.user.tier}`}`
+                : '—'}
             </button>
           </div>
         </header>

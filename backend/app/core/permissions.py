@@ -4,6 +4,9 @@ Eén lijst met alle rechten, zodat je in één oogopslag ziet wie wat mag. Tier 
 eigenaar; hoe hoger het tiernummer, hoe minder rechten. Een gebruiker mag een recht
 als zijn tier kleiner of gelijk is aan `max_tier`.
 
+Zonder tier (`None`) mag je niets. Dat is met opzet geen aparte reeks if-jes in de
+endpoints: het zit hier, in `tier_allows`, zodat het overal op dezelfde manier uitpakt.
+
 `sensitive` betekent: deze handeling vraagt een tweede bevestiging met het wachtwoord
 voordat hij wordt uitgevoerd.
 """
@@ -34,6 +37,10 @@ PERMISSIONS: tuple[Permission, ...] = (
     Permission("workflows.read", "Workflows bekijken", TIER_TRUSTED),
     Permission("integrations.read", "Integraties bekijken", TIER_TRUSTED),
     Permission("integrations.manage", "Integraties koppelen of loskoppelen", TIER_OWNER, True),
+    # Stem: herkennen kan zonder recht (dat ís de herkenning), de rest niet.
+    Permission("voice.read", "Ingeschreven stemmen bekijken", TIER_TRUSTED),
+    Permission("voice.enroll", "Een stem inschrijven en zo toegang uitdelen", TIER_OWNER, True),
+    Permission("voice.delete", "Een ingeschreven stem weghalen", TIER_OWNER, True),
     # To-do
     Permission("todo.read", "Dagelijkse takenlijst bekijken", TIER_LIMITED),
     Permission("todo.write", "Taken maken, wijzigen en afvinken", TIER_TRUSTED),
@@ -59,10 +66,14 @@ def get_permission(key: str) -> Permission:
         raise KeyError(f"Onbekend recht: {key}") from exc
 
 
-def tier_allows(tier: int, key: str) -> bool:
+def tier_allows(tier: int | None, key: str) -> bool:
+    if tier is None:
+        return False
     return tier <= get_permission(key).max_tier
 
 
-def permissions_for_tier(tier: int) -> list[str]:
+def permissions_for_tier(tier: int | None) -> list[str]:
     """Wat deze tier mag. De frontend verbergt hiermee wat toch niet werkt."""
+    if tier is None:
+        return []
     return [perm.key for perm in PERMISSIONS if tier <= perm.max_tier]

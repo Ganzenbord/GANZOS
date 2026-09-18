@@ -1,0 +1,8 @@
+# Stemherkenning. Apart, want SpeechBrain brengt torch mee — samen ruim een gigabyte.
+# Zonder deze stap draait Ganz gewoon; alleen /voice/enroll en /voice/identify geven dan
+# een nette melding dat het niet geïnstalleerd is.
+#
+#   pip install -r requirements-voice.txt
+speechbrain==1.0.2
+torch==2.5.1
+torchaudio==2.5.1

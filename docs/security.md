@@ -5,6 +5,12 @@
 Tier 1 is de eigenaar en mag alles. Hoe hoger het nummer, hoe minder rechten. Je hebt
 een recht als je tier kleiner of gelijk is aan het maximum van dat recht.
 
+**Geen tier (`NULL`) betekent: wel bekend, geen toegang.** Dat is iets anders dan een
+uitgezet account (`active=False`) en iets anders dan de laagste tier (mag een beetje). Je
+hebt het nodig zodra een stem herkend kan worden: dan wil je "dag Piet" kunnen zeggen zonder
+Piet ergens binnen te laten. Zo iemand krijgt wel een token, maar elk endpoint antwoordt met
+403.
+
 | Recht | Vanaf tier | Tweede bevestiging |
 | --- | --- | --- |
 | `core.read` | 4 | |
@@ -16,16 +22,24 @@ een recht als je tier kleiner of gelijk is aan het maximum van dat recht.
 | `memory.read`, `conversations.read`, `workflows.read` | 2 | |
 | `activity.read`, `integrations.read` | 2 | |
 | `social.manage` | 2 | **ja** |
+| `voice.read` | 2 | |
 | `finance.read` | **1** | |
 | `finance.manage` | **1** | **ja** |
 | `upload.execute` | **1** | **ja** |
 | `integrations.manage` | **1** | **ja** |
+| `voice.enroll`, `voice.delete` | **1** | **ja** |
 
 Finance is tier 1. Een upload daadwerkelijk uitvoeren ook: dat zet iets in gang naar
-buiten toe.
+buiten toe. Een stem inschrijven eveneens — dat ís de handeling waarmee je toegang uitdeelt.
 
 Het register staat in `backend/app/core/permissions.py` — één lijst, zodat je in één oogopslag
-ziet wie wat mag.
+ziet wie wat mag. Endpoints bevatten geen eigen regeltjes: ze noemen alleen waar ze over gaan
+(`require_permission("upload.execute")`) en het register bepaalt de rest. Wil je iets van
+niveau veranderen, dan verander je één regel daar en niets aan de endpoints.
+
+Voor het enkele geval dat er geen passend recht bestaat is er `require_tier(min_tier)`. Heeft
+wat je afschermt een naam, gebruik dan het register — dan zie je het ook terug in
+`/api/auth/me`.
 
 ## Tweede bevestiging
 
@@ -34,10 +48,40 @@ bevestigingstoken op:
 
 ```
 POST /api/auth/confirm    { "password": "..." }
+POST /api/auth/confirm    { "pin": "2468", "permission_key": "upload.execute" }
 ```
 
 Dat token is vijf minuten geldig en gaat mee in de header `X-Ganz-Confirmation`.
 Ontbreekt hij, dan antwoordt de API met 428.
+
+### Waarom er een tabel achter zit
+
+Elke bevestiging staat als rij in `confirmation_requests`, en het token verwijst ernaar.
+Alleen een token zou geen spoor nalaten: je kunt achteraf niet zien dát er bevestigd is,
+waarvoor, of hoe vaak het misging. Met de rij erbij geldt bovendien:
+
+- **Eén bevestiging dekt één handeling af.** Daarna gaat de rij op `used`; hetzelfde token
+  komt niet nog een keer langs de kassa.
+- **Vul je `permission_key` in, dan geldt de bevestiging alleen daarvoor.** Bevestigen om het
+  weer op te vragen en er dan een upload mee doen, kan niet.
+- **Drie mispogingen en het is klaar.** Een pincode van vier cijfers is anders zo
+  doorgeprobeerd; het rekenwerk van de hashing alleen is daarvoor niet genoeg.
+
+### De pincode
+
+`POST /api/auth/pin` met je huidige wachtwoord en een nieuwe pincode (4 tot 12 cijfers, niet
+allemaal dezelfde en geen oplopende reeks). De pincode wordt gehasht met dezelfde functie als
+wachtwoorden (pbkdf2_sha256) en staat nooit leesbaar in de database.
+
+De pincode is bedoeld voor de telefoon en voor bediening met de stem, waar een heel wachtwoord
+intikken onhandig is. Hij vervángt het wachtwoord niet: je kunt hem alleen gebruiken als je al
+ingelogd of herkend bent.
+
+### En een herkende stem?
+
+Die telt als aanmelding, niet als bevestiging. Sterker nog: kwam je binnen via een
+stemherkenning die **zwakker was dan `GANZ_VOICE_STRONG_THRESHOLD`**, dan kun je met dat token
+helemaal niets bevestigen — ook niet met de juiste pincode. Zie [voice.md](voice.md).
 
 Een inlogtoken kan nooit als bevestiging dienen: er zit een `purpose` in het token en
 die wordt gecontroleerd. Anders zou de extra drempel een formaliteit zijn — en zou wie

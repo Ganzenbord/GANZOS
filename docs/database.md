@@ -34,6 +34,7 @@ migratie tegen een andere database draaien, dan kan dat met `-x db_url=...`.
 | `llm_provider_status` | laatst gemeten toestand van de taalmodellen |
 | `voice_profiles` | de vingerafdruk van een ingesproken stem |
 | `videos` | video's, van concept tot gepubliceerd |
+| `confirmation_requests` | elke tweede bevestiging, geslaagd of niet |
 
 ### Dezelfde tabel, een andere naam
 
@@ -49,13 +50,13 @@ tijdelijke architectuur die later weggegooid moet worden.
 | `Memory` | `memory_entries` |
 | `ChannelStats` | `social_channel_stats` |
 | `Permission` | geen tabel: het register in `app/core/permissions.py` |
+| `ConfirmationRequest` | `confirmation_requests` |
 
 Nog niet gebouwd, en waar ze horen als ze nodig zijn:
 
 | Nog te maken | Waarvoor, en wanneer |
 | --- | --- |
 | `AuthSession` | een lopende aanmelding vasthouden in plaats van alleen een JWT; nodig zodra een sessie ingetrokken moet kunnen worden |
-| `ConfirmationRequest` | de tweede bevestiging als tabel in plaats van een kortlevend token; nodig zodra een bevestiging aan één specifieke handeling moet hangen |
 | `ScheduledTask` | geplande taken in het algemeen; nu is er alleen `upload_schedules`, dat over uploads gaat |
 
 ## Tijdstippen

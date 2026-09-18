@@ -2,7 +2,7 @@
    Bedragen komen binnen als tekst, niet als getal: een float zou bij optellen centen
    laten verdwijnen. Rekenen doet de backend; hier tonen we alleen. */
 
-export type Tier = 1 | 2 | 3 | 4
+export type Tier = 1 | 2 | 3 | 4 | null;  // null = wel bekend, geen toegang
 
 export interface Subtask {
   id: number

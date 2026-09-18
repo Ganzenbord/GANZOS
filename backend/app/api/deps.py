@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.permissions import get_permission, tier_allows
+from app.services import confirmation_service
 from app.core.security import decode_token
 from app.models.user import User
 
@@ -17,6 +18,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     session: AsyncSession = Depends(get_session),
 ) -> User:
@@ -28,15 +30,29 @@ async def get_current_user(
     user = await session.get(User, int(payload["sub"]))
     if user is None or not user.active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account bestaat niet of is geblokkeerd")
+
+    # Waar deze aanmelding vandaan komt, blijft het hele verzoek beschikbaar. /auth/confirm
+    # heeft het nodig: een bevestiging die op een zwakke stemherkenning leunt, telt niet.
+    request.state.token_origin = payload.get("origin")
+    request.state.token_confidence = payload.get("confidence")
     return user
 
 
 def require_permission(key: str) -> Callable[..., Awaitable[User]]:
-    """Geeft een dependency die het recht `key` afdwingt."""
+    """Geeft een dependency die het recht `key` afdwingt.
+
+    Dit is de gewone manier: een endpoint noemt alleen waar het over gaat, het register in
+    `core/permissions.py` bepaalt welk niveau daarbij hoort. Geen if-jes per endpoint.
+    """
 
     permission = get_permission(key)
 
     async def dependency(user: User = Depends(get_current_user)) -> User:
+        if user.tier is None:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Je bent bekend, maar hebt geen toegang tot Ganz.",
+            )
         if not tier_allows(user.tier, permission.key):
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
@@ -48,11 +64,40 @@ def require_permission(key: str) -> Callable[..., Awaitable[User]]:
     return dependency
 
 
-def require_confirmation(key: str) -> Callable[..., Awaitable[User]]:
-    """Als het recht gevoelig is, moet er ook een geldig bevestigingstoken mee.
+def require_tier(min_tier: int) -> Callable[..., Awaitable[User]]:
+    """Eist rechtstreeks een tier, voor het enkele geval dat er geen passend recht bestaat.
 
-    Dat token haal je op met POST /auth/confirm en je wachtwoord. Zo kan een gestolen
-    inlogtoken alleen kijken, niet je financiële accounts loskoppelen.
+    Let op de richting: een lager nummer is méér toegang, dus `min_tier` is de zwakste tier
+    die nog naar binnen mag. Heeft wat je afschermt een naam, gebruik dan
+    `require_permission()` — dan staat het in het register en zie je het terug in /auth/me.
+    """
+
+    async def dependency(user: User = Depends(get_current_user)) -> User:
+        if user.tier is None:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Je bent bekend, maar hebt geen toegang tot Ganz.",
+            )
+        if user.tier > min_tier:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"Hiervoor heb je tier {min_tier} of hoger nodig.",
+            )
+        return user
+
+    return dependency
+
+
+def require_confirmation(key: str) -> Callable[..., Awaitable[User]]:
+    """Als het recht gevoelig is, moet er ook een geldige bevestiging mee.
+
+    Die haal je op met POST /auth/confirm en je wachtwoord of pincode. Zo kan een gestolen
+    inlogtoken alleen kijken, niet je financiële accounts loskoppelen — en een herkende stem
+    evenmin, want een stem is na te maken.
+
+    Het token verwijst naar een rij in `confirmation_requests`. Die rij wordt hier opgebruikt:
+    één bevestiging dekt één handeling af, en hetzelfde token kan niet nog een keer langs de
+    kassa. Zonder die rij zou je achteraf ook niet kunnen zien dát er bevestigd is.
     """
 
     permission = get_permission(key)
@@ -61,16 +106,33 @@ def require_confirmation(key: str) -> Callable[..., Awaitable[User]]:
     async def dependency(
         request: Request,
         user: User = Depends(permission_dep),
+        session: AsyncSession = Depends(get_session),
         x_ganz_confirmation: str | None = Header(default=None),
     ) -> User:
         if not permission.sensitive:
             return user
+
         payload = decode_token(x_ganz_confirmation or "", "confirmation")
-        if payload is None or int(payload["sub"]) != user.id:
+        if payload is None or int(payload["sub"]) != user.id or "cr" not in payload:
             raise HTTPException(
                 status.HTTP_428_PRECONDITION_REQUIRED,
-                "Bevestig eerst met je wachtwoord (POST /auth/confirm).",
+                "Bevestig eerst met je wachtwoord of pincode (POST /auth/confirm).",
             )
+
+        try:
+            await confirmation_service.consume(
+                session,
+                verzoek_id=int(payload["cr"]),
+                user_id=user.id,
+                permission_key=permission.key,
+            )
+        except confirmation_service.ConfirmationError as exc:
+            # Commit wat de service aan de rij veranderde (bijvoorbeeld op 'failed' zetten),
+            # anders verdwijnt dat spoor bij het terugdraaien.
+            await session.commit()
+            raise HTTPException(exc.status_code, exc.message) from exc
+        await session.commit()
+
         request.state.confirmed = True
         return user
 

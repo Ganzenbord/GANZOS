@@ -9,7 +9,7 @@ from app.models.social import ChannelStatus
 from app.models.upload import ContentType, UploadRecurrence, UploadStatus
 from app.services import social_service, upload_service
 from app.utils.timeutil import next_upload_occurrence
-from tests.conftest import auth_headers
+from tests.conftest import auth_headers, confirm_headers
 
 NOW = datetime(2025, 9, 15, 11, 18, 21, tzinfo=timezone.utc)
 
@@ -192,7 +192,7 @@ async def test_executing_an_upload_needs_confirmation(client, owner, session):
     ok = await client.post(
         f"/uploads/{upload.id}/status",
         json={"status": "uploading"},
-        headers=auth_headers(owner, confirm=True),
+        headers=await confirm_headers(session, owner),
     )
     assert ok.status_code == 200
     assert ok.json()["status"] == "uploading"

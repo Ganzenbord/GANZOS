@@ -15,21 +15,23 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, dashboard, finance, health, platform, social, todos, uploads
+from app.api import auth, dashboard, finance, health, platform, social, todos, uploads, voice
 from app.core.config import Settings, get_settings
 from app.core.database import Database, create_database
+from app.integrations.voice import SpeakerEncoder, SpeechBrainEncoder
 from app.workers.scheduler import shutdown_scheduler, start_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ganz")
 
-API_MODULES = (auth, dashboard, platform, todos, finance, social, uploads)
+API_MODULES = (auth, dashboard, platform, todos, finance, social, uploads, voice)
 
 
 def create_app(
     *,
     settings: Settings | None = None,
     database: Database | None = None,
+    speaker_encoder: SpeakerEncoder | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     # Een meegegeven database is van de aanroeper; die ruimt hem zelf op.
@@ -39,6 +41,11 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = settings
         app.state.database = database or create_database(settings)
+        # Het model wordt hier nog niet geladen; dat gebeurt pas bij het eerste gebruik,
+        # anders duurt opstarten minuten voor iets wat misschien niet nodig is.
+        app.state.speaker_encoder = speaker_encoder or SpeechBrainEncoder(
+            model_name=settings.voice_model, cache_dir=settings.voice_model_cache_dir
+        )
         start_scheduler(app.state.database, settings=settings)
         logger.info("Ganz gestart in omgeving %s", settings.environment)
         try:

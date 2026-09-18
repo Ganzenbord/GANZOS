@@ -14,6 +14,8 @@ from app.core.config import get_settings
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 TokenPurpose = Literal["access", "confirmation"]
+# Waar een aanmelding vandaan komt. Een stem is na te maken, een wachtwoord niet zomaar.
+TokenOrigin = Literal["password", "voice"]
 ALGORITHM = "HS256"
 
 
@@ -25,7 +27,17 @@ def verify_password(password: str, password_hash: str) -> bool:
     return pwd_context.verify(password, password_hash)
 
 
-def create_token(subject: int, purpose: TokenPurpose = "access") -> str:
+def create_token(
+    subject: int,
+    purpose: TokenPurpose = "access",
+    **extra: Any,
+) -> str:
+    """Maak een token. `extra` komt er als losse velden bij te staan.
+
+    Zo draagt een token dat uit een stemherkenning komt zijn herkomst met zich mee
+    (`origin="voice"`, plus de gelijkenis). Dat is nodig omdat een stem na te maken is: bij
+    gevoelige handelingen moet je kunnen zien waar de aanmelding vandaan kwam.
+    """
     settings = get_settings()
     minutes = (
         settings.access_token_minutes
@@ -38,6 +50,7 @@ def create_token(subject: int, purpose: TokenPurpose = "access") -> str:
         "purpose": purpose,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=minutes)).timestamp()),
+        **{sleutel: waarde for sleutel, waarde in extra.items() if waarde is not None},
     }
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 

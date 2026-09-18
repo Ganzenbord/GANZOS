@@ -18,7 +18,11 @@ Environment = Literal["development", "test", "production"]
 # Alleen in development mag Ganz terugvallen op vaste sleutels. De waarden zijn
 # met opzet zichtbaar onzin, zodat ze nooit per ongeluk in productie blijven staan.
 DEV_SECRET_KEY = "dev-only-not-secret-change-me"
-DEV_ENCRYPTION_KEY = "ZGV2LW9ubHktbm90LXNlY3JldC1jaGFuZ2UtbWUtMDAwMDA="
+# Een Fernet-sleutel is precies 32 bytes, url-safe base64. De vorige waarde was er 35 en
+# dus onbruikbaar: alles wat tokens versleutelt liep in development stuk op een 500, met
+# een melding die naar de verkeerde kant wees. De tests merkten dat niet, want die zetten
+# een eigen sleutel.
+DEV_ENCRYPTION_KEY = "ZGV2LW9ubHktbm90LXNlY3JldC1jaGFuZ2UtbWUtMDA="
 
 
 class Settings(BaseSettings):
@@ -52,6 +56,30 @@ class Settings(BaseSettings):
 
     # Ouder dan dit en het dashboard noemt de gegevens verouderd.
     stale_after_minutes: int = 60
+
+    # --- Stemherkenning -----------------------------------------------------
+    # Het model dat van een opname een vingerafdruk maakt. Wissel je van model, dan moet
+    # iedereen opnieuw worden ingeschreven: afdrukken van twee modellen zijn onvergelijkbaar.
+    voice_model: str = "speechbrain/spkrec-ecapa-voxceleb"
+    voice_model_cache_dir: str | None = None
+
+    # Vanaf hoeveel gelijkenis (0 tot 1) een stem als herkend geldt. Hoger is strenger: vaker
+    # "ik herken je niet", minder kans dat iemand anders wordt binnengelaten. 0.25 is de
+    # waarde die SpeechBrain zelf aanhoudt — stel hem bij met echte opnames.
+    voice_match_threshold: float = 0.25
+
+    # Onder deze grens is de herkenning te zwak om iets mee te doen dat er toe doet. Zo'n
+    # aanmelding krijgt wel een token, maar de bevestiging voor gevoelige acties kan er niet
+    # mee (zie app/services/confirmation_service.py).
+    voice_strong_threshold: float = 0.45
+
+    voice_min_seconds: float = 1.0
+    voice_max_seconds: float = 30.0
+    voice_max_upload_bytes: int = 10 * 1024 * 1024
+
+    # Zolang er nog geen enkele stem is ingeschreven kan niemand herkend worden, en zou
+    # niemand ooit kunnen beginnen. Zet dit op false zodra iedereen erin staat.
+    voice_enrollment_open_when_empty: bool = True
 
     # Seed-data is uitsluitend voor development; zie scripts/seed.py.
     allow_seed_data: bool = False

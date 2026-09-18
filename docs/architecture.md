@@ -61,9 +61,10 @@ backend/
       base.py       de koppelvlakken waar iedereen zich aan houdt
       finance/      handmatig, crypto-koersen, register
       social/       YouTube, Instagram, TikTok, register
+      voice/        SpeechBrain achter een koppelvlak
       fx.py         wisselkoersen naar euro
     workers/        de achtergrondtaken
-    utils/          geld, tijd, versleuteling
+    utils/          geld, tijd, versleuteling, audio, afdrukken, pincode-eisen
   alembic/          de migraties
   tests/            de testsuite
   scripts/          gebruiker aanmaken, voorbeelddata
