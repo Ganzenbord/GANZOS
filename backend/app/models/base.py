@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from typing import Any
 
-from sqlalchemy import DateTime, Dialect, func
+from sqlalchemy import JSON, DateTime, Dialect, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
 
@@ -14,6 +14,15 @@ from sqlalchemy.types import TypeDecorator
 def utcnow() -> datetime:
     """Altijd een tijdzone-bewuste UTC-tijd; naïeve tijden geven later rekenfouten."""
     return datetime.now(timezone.utc)
+
+
+# Een JSON-kolom waarin Python-None ook echt SQL NULL wordt.
+#
+# Standaard doet SQLAlchemy dat níét: `None` gaat er als de JSON-waarde `null` in, en dan is
+# `WHERE kolom IS NOT NULL` waar terwijl er niets in staat. Dat is precies verkeerd om voor
+# een kolom waar leeg "bestaat nog niet" betekent — een stemprofiel zonder afdruk telde zo
+# mee als ingeschreven stem.
+NullableJSON = JSON(none_as_null=True)
 
 
 class UtcDateTime(TypeDecorator[datetime]):

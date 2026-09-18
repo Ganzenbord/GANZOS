@@ -134,7 +134,8 @@ async def test_api_create_toggle_and_log(client, owner, session):
     assert toggled.json()["completed"] is True
 
     activity = await client.get("/activity", headers=auth_headers(owner))
-    actions = [row["action"] for row in activity.json()]
+    # /activity levert sinds fase 4 pagina's: een omslag met items, total en has_more.
+    actions = [row["action"] for row in activity.json()["items"]]
     assert "TODO_CREATED" in actions
     assert "TODO_COMPLETED" in actions
 

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.api.deps import require_permission
+from app.core.permissions import tier_allows
 from app.models.platform import (
     Conversation,
     Integration,
@@ -38,7 +39,13 @@ async def core(
 
 @router.get("/system")
 async def system(user: User = Depends(require_permission("system.read"))):
-    return snapshot()
+    """Het stoplicht voor het dashboard.
+
+    De cijfers erbij alleen voor wie `system.admin` heeft (tier 1); de rest ziet of alles
+    nog draait en verder niets. Anders zou de tier-1-eis op /system/metrics niets
+    voorstellen.
+    """
+    return snapshot(detailed=tier_allows(user.tier, "system.admin"))
 
 
 @router.get("/llm")
@@ -171,21 +178,6 @@ async def workflows(
     ]
 
 
-@router.get("/activity")
-async def activity(
-    limit: int = Query(default=50, ge=1, le=200),
-    user: User = Depends(require_permission("activity.read")),
-    session: AsyncSession = Depends(get_session),
-):
-    return [
-        {
-            "id": entry.id,
-            "action": entry.action,
-            "message": entry.message,
-            "subject_type": entry.subject_type,
-            "subject_id": entry.subject_id,
-            "context": entry.context,
-            "created_at": entry.created_at,
-        }
-        for entry in await recent_activity(session, user_id=user.id, limit=limit)
-    ]
+# GET /activity is verhuisd naar app/api/status.py. Daar levert hij pagina's met het totaal
+# erbij, zodat de frontend weet of er nog meer is. Twee versies naast elkaar zou betekenen
+# dat FastAPI er stilzwijgend één kiest — dat is hier eerder misgegaan met /skills.

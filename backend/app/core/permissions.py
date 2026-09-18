@@ -29,6 +29,9 @@ class Permission:
 PERMISSIONS: tuple[Permission, ...] = (
     Permission("core.read", "Ganz Core en de status bekijken", TIER_GUEST),
     Permission("system.read", "Systeemmonitor bekijken", TIER_LIMITED),
+    # De ruwe metingen (belasting, schijfruimte, hoe lang de machine al draait) zeggen
+    # meer over de computer dan het stoplicht op het dashboard. Alleen voor tier 1.
+    Permission("system.admin", "Systeemmetingen in detail bekijken", TIER_OWNER),
     Permission("activity.read", "Activiteitenlog bekijken", TIER_TRUSTED),
     Permission("skills.read", "Skills bekijken", TIER_LIMITED),
     Permission("skills.write", "Skills maken, wijzigen en verwijderen", TIER_TRUSTED),

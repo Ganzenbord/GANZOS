@@ -66,7 +66,8 @@ async def build_dashboard(
     if tier_allows(user.tier, "upload.read"):
         payload["uploads"] = await upload_service.schedule_overview(session, user.id, now)
     if tier_allows(user.tier, "system.read"):
-        payload["system"] = snapshot()
+        # Alleen tier 1 krijgt de cijfers erbij; de rest ziet het stoplicht.
+        payload["system"] = snapshot(detailed=tier_allows(user.tier, "system.admin"))
     if tier_allows(user.tier, "memory.read"):
         payload["memory"] = await core_service.memory_insights(session, user.id)
     if tier_allows(user.tier, "activity.read"):

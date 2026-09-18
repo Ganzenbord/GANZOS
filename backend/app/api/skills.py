@@ -84,6 +84,21 @@ async def list_tools(
     ]
 
 
+@router.get("/skills/active", response_model=list[SkillOut])
+async def list_active_skills(
+    user: User = Depends(require_permission("skills.read")),
+    session: AsyncSession = Depends(get_session),
+) -> list[SkillOut]:
+    """Alleen de skills die aanstaan, de meest gebruikte eerst.
+
+    Staat met opzet vóór /skills/{skill_id} in dit bestand: FastAPI kijkt op volgorde, en
+    "active" zou anders als skill-id gelezen worden.
+    """
+    skills = [s for s in await skill_service.list_skills(session, user.id) if s.enabled]
+    skills.sort(key=lambda s: (-s.run_count, s.name))
+    return [SkillOut.model_validate(s, from_attributes=True) for s in skills]
+
+
 @router.post("/skills", response_model=SkillOut, status_code=status.HTTP_201_CREATED)
 async def create_skill(
     payload: SkillCreate,

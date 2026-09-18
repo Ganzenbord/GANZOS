@@ -186,6 +186,10 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
               <ModulePage
                 title="Activiteitenlog"
                 endpoint="/activity?limit=200"
+                // /activity levert een pagina: de lijst zit in `items`, met het totaal ernaast.
+                pick={(payload) =>
+                  (payload as { items: Record<string, unknown>[] }).items ?? []
+                }
                 columns={[
                   { key: 'created_at', label: 'Wanneer', kind: 'datetime' },
                   { key: 'action', label: 'Gebeurtenis' },

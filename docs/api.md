@@ -16,6 +16,33 @@ Antwoordt de database niet, dan komt er een `503` met `"status": "degraded"`,
 Alles staat onder `/api`. Inloggen gaat met een bearer-token in de
 `Authorization`-header.
 
+## Het Command Center
+
+| Endpoint | Wat het doet | Recht |
+| --- | --- | --- |
+| `GET /api/status` | draait alles nog: core, stem, skills, integraties, systeem | `core.read` |
+| `GET /api/activity` | het logboek, per pagina (`limit`, `offset`, `action`) | `activity.read` |
+| `GET /api/schedule/today` | wat er vandaag op de rol staat: uploads én taken | `tasks.read` |
+| `GET /api/skills/active` | de skills die aanstaan, meest gebruikte eerst | `skills.read` |
+| `GET /api/system/metrics` | de ruwe metingen van de computer | `system.admin` (**tier 1**) |
+| `GET /api/memory/overview` | hoeveel Ganz onthoudt en wat er het laatst gebeurde | `memory.read` |
+
+`/api/dashboard` blijft bestaan en levert alle panelen in één keer — dat scheelt een stuk of
+tien aanroepen bij het openen. De endpoints hierboven zijn er voor wie één ding wil, of wil
+doorbladeren.
+
+### Pagineren
+
+`/api/activity` geeft een omslag om de lijst heen:
+
+```json
+{ "items": [ … ], "total": 412, "limit": 50, "offset": 0, "has_more": true }
+```
+
+Zonder dat totaal kan de frontend niet weten of er nog meer is. Er wordt gesorteerd op tijd
+én op id: twee regels in dezelfde milliseconde zouden anders tussen twee pagina's van
+volgorde kunnen wisselen, en dan zie je er één dubbel en mis je er één.
+
 ## Skills en taken
 
 | Endpoint | Wat het doet | Recht |

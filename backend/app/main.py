@@ -23,6 +23,7 @@ from app.api import (
     platform,
     skills,
     social,
+    status,
     todos,
     uploads,
     voice,
@@ -42,7 +43,18 @@ from app.workers.scheduler import shutdown_scheduler, start_scheduler
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ganz")
 
-API_MODULES = (auth, dashboard, platform, todos, finance, social, uploads, voice, skills)
+API_MODULES = (
+    auth,
+    dashboard,
+    platform,
+    todos,
+    finance,
+    social,
+    uploads,
+    voice,
+    skills,
+    status,
+)
 
 
 def create_app(

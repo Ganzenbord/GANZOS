@@ -59,6 +59,19 @@ Nog niet gebouwd, en waar ze horen als ze nodig zijn:
 | `AuthSession` | een lopende aanmelding vasthouden in plaats van alleen een JWT; nodig zodra een sessie ingetrokken moet kunnen worden |
 | `ScheduledTask` | geplande taken in het algemeen; nu is er alleen `upload_schedules`, dat over uploads gaat |
 
+## Leeg in een JSON-kolom
+
+Gebruik `NullableJSON` uit `app/models/base.py` voor een JSON-kolom waar leeg "bestaat nog
+niet" betekent, en waar je op `IS NULL` wilt kunnen zoeken.
+
+Standaard schrijft SQLAlchemy een Python-`None` in een JSON-kolom weg als de JSON-waarde
+`null`, niet als SQL NULL. `WHERE kolom IS NOT NULL` is dan gewoon waar, en dat is precies
+verkeerd om. Dat ging hier echt mis: een stemprofiel zonder afdruk telde mee als ingeschreven
+stem — het stoplicht stond op "luisterend" zonder dat er één opname was, en de "eerste
+inschrijving is open"-deur ging erdoor dicht.
+
+Aan de tabellen verandert het niets; het is de Python-kant.
+
 ## Tijdstippen
 
 Alles wordt opgeslagen als UTC met tijdzone, en komt er ook zo weer uit — op elke

@@ -26,6 +26,7 @@ Piet ergens binnen te laten. Zo iemand krijgt wel een token, maar elk endpoint a
 | `skills.write` | 2 | |
 | `tasks.write`, `tasks.execute` | 2 | zie hieronder |
 | `finance.read` | **1** | |
+| `system.admin` | **1** | |
 | `finance.manage` | **1** | **ja** |
 | `upload.execute` | **1** | **ja** |
 | `integrations.manage` | **1** | **ja** |
@@ -33,6 +34,11 @@ Piet ergens binnen te laten. Zo iemand krijgt wel een token, maar elk endpoint a
 
 Finance is tier 1. Een upload daadwerkelijk uitvoeren ook: dat zet iets in gang naar
 buiten toe. Een stem inschrijven eveneens — dat ís de handeling waarmee je toegang uitdeelt.
+
+`system.read` en `system.admin` zijn met opzet twee dingen. Het stoplicht op het dashboard
+(`/system`) zegt of alles nog draait en mag iedereen zien. De ruwe metingen
+(`/system/metrics`: belasting, schijfruimte, hoe lang de machine al aanstaat) gaan over de
+computer zelf en zijn alleen voor tier 1.
 
 Het register staat in `backend/app/core/permissions.py` — één lijst, zodat je in één oogopslag
 ziet wie wat mag. Endpoints bevatten geen eigen regeltjes: ze noemen alleen waar ze over gaan

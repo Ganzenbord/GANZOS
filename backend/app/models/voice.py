@@ -13,10 +13,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, UtcDateTime
+from app.models.base import Base, NullableJSON, TimestampMixin, UtcDateTime
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -31,7 +31,9 @@ class VoiceProfile(Base, TimestampMixin):
     )
     label: Mapped[str] = mapped_column(String(120), nullable=False)
 
-    embedding: Mapped[list[float] | None] = mapped_column(JSON, nullable=True)
+    # NullableJSON en niet JSON: leeg moet hier echt NULL worden, want er wordt op
+    # `IS NOT NULL` gefilterd om te zien of iemand is ingeschreven.
+    embedding: Mapped[list[float] | None] = mapped_column(NullableJSON, nullable=True)
     # Welk model de afdruk maakte. Afdrukken van twee modellen zijn onvergelijkbaar, dus bij
     # een modelwissel moet iedereen zich opnieuw laten inschrijven — dat moet je kunnen zien.
     embedding_model: Mapped[str | None] = mapped_column(String(190), nullable=True)
