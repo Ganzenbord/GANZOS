@@ -63,6 +63,36 @@ async def test_een_andere_seed_geeft_andere_data() -> None:
     ]
 
 
+async def test_de_synthetische_bron_heeft_geen_drift() -> None:
+    """De prijzen mogen niet systematisch oplopen, en dit is geen smaakkwestie.
+
+    Dit stond eerst fout: met een factor (1 + u) en u uit uniform(-0,04, +0,045) liep de
+    prijs over een etmaal een factor 15.800 op. De controlegroep H0 — die willekeurig
+    instapt — kwam daardoor uit op +8R met een winrate van 100%. Dat ziet er geloofwaardig
+    uit en berust op niets. Een ruisvloer die geld verdient, is geen ruisvloer.
+    """
+    import json
+    import math
+
+    prijzen: dict[str, list[float]] = {}
+    async for event in bron(duration=timedelta(hours=6)).events():
+        payload = json.loads(event.payload_raw)
+        if payload.get("type") != "tick":
+            continue
+        prijzen.setdefault(payload["pool"], []).append(float(payload["price_usd"]))
+
+    for pool, reeks in prijzen.items():
+        stappen = [
+            math.log(reeks[i] / reeks[i - 1])
+            for i in range(1, len(reeks))
+            if reeks[i] > 0 and reeks[i - 1] > 0
+        ]
+        gemiddeld = sum(stappen) / len(stappen)
+        # Ruim binnen wat je bij een drift van nul verwacht; bij de oude bron was dit
+        # +0,0022 en viel deze test dus om.
+        assert abs(gemiddeld) < 0.0005, f"{pool} heeft een drift van {gemiddeld:+.6f} per stap"
+
+
 async def test_de_synthetische_bron_noemt_zichzelf_synthetisch() -> None:
     """Niemand mag deze data ooit voor echte marktdata kunnen aanzien."""
     assert bron().name == "synthetic"

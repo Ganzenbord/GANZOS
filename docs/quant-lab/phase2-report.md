@@ -1,5 +1,12 @@
 # Quant Lab — Fase 2: datalaag en replay
 
+> **Naschrift bij fase 3.** De synthetische bron is in fase 3 op drie punten gewijzigd: de
+> prijsbeweging had een drift die élke willekeurige instap liet winnen, de pools gingen
+> allemaal aan het begin open, en de ingest deed één query per event. De conclusie van dit
+> rapport — een opgenomen uur is bit-voor-bit herhaalbaar — staat nog, maar de **afdrukken
+> en aantallen hieronder horen bij de oude bron** en komen er nu anders uit. Zie
+> `phase3-report.md` §3 en §4.
+
 **Kort:** de Scout, de ruwe append-only opslag met een hashketting, de validatiechecks en de
 replay-runner staan er. De testsuite is groen: **397 tests, waarvan 40 nieuw**. Een opgenomen
 uur is bit-voor-bit herhaalbaar — aangetoond tegen een echte PostgreSQL, niet alleen in de

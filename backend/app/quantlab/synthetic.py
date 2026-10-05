@@ -75,6 +75,8 @@ class SyntheticPoolSource:
         pools: int = 3,
         cadence_seconds: int = 10,
         defects: set[SyntheticDefect] | frozenset[SyntheticDefect] | None = None,
+        new_pool_every_minutes: int | None = None,
+        pool_lifetime_minutes: int | None = None,
     ) -> None:
         self._seed = seed
         self._start_at = start_at
@@ -82,6 +84,13 @@ class SyntheticPoolSource:
         self._pools = pools
         self._cadence = cadence_seconds
         self._defects = frozenset(defects or ())
+        # Zonder deze twee gaan alle pools aan het begin open en blijven ze het hele corpus
+        # ticken. Dat is goed genoeg om de datalaag te belasten, maar het is géén universum
+        # voor een sniper: die kijkt naar tokens van 5 tot 30 minuten oud, en na het eerste
+        # uur komt er dan niets meer in aanmerking. Met deze twee komt er doorlopend een
+        # nieuwe pool bij en houdt een pool na een tijd op — zoals een memecoin dat doet.
+        self._new_pool_every = new_pool_every_minutes
+        self._lifetime = pool_lifetime_minutes
 
     def streams(self) -> tuple[str, ...]:
         return ("ticks",)
@@ -96,6 +105,30 @@ class SyntheticPoolSource:
             source=self.name, stream="ticks", payload_raw=tekst, received_at=moment
         )
 
+    def _nieuwe_pool(self, nummer: int, moment, toeval: random.Random) -> dict:
+        return {
+            "pool": f"pool-{nummer}",
+            "token": f"token-{nummer}",
+            "created_at": moment,
+            "price": Decimal(str(round(toeval.uniform(0.000001, 0.01), 12))),
+            "liquidity": Decimal(str(round(toeval.uniform(5_000, 80_000), 2))),
+        }
+
+    def _geboorte(self, pool: dict) -> RawEvent:
+        return self._event(
+            {
+                "type": "pool_created",
+                "pool": pool["pool"],
+                "token": pool["token"],
+                "venue": VENUE,
+                "chain": CHAIN,
+                "observed_at": pool["created_at"].isoformat(),
+                "pool_created_at": pool["created_at"].isoformat(),
+                "liquidity_usd": str(pool["liquidity"]),
+            },
+            pool["created_at"],
+        )
+
     async def events(self) -> AsyncIterator[RawEvent]:
         toeval = random.Random(self._seed)
         einde = self._start_at + self._duration
@@ -103,36 +136,46 @@ class SyntheticPoolSource:
         pools = []
         for nummer in range(self._pools):
             pools.append(
-                {
-                    "pool": f"pool-{nummer + 1}",
-                    "token": f"token-{nummer + 1}",
+                self._nieuwe_pool(
+                    nummer + 1,
                     # De pools gaan niet allemaal op hetzelfde moment open; H1 kijkt naar
                     # tokenleeftijd, dus dat verschil moet erin zitten.
-                    "created_at": self._start_at + timedelta(minutes=nummer * 3),
-                    "price": Decimal(str(round(toeval.uniform(0.000001, 0.01), 12))),
-                    "liquidity": Decimal(str(round(toeval.uniform(5_000, 80_000), 2))),
-                }
+                    self._start_at + timedelta(minutes=nummer * 3),
+                    toeval,
+                )
             )
 
         for pool in pools:
-            yield self._event(
-                {
-                    "type": "pool_created",
-                    "pool": pool["pool"],
-                    "token": pool["token"],
-                    "venue": VENUE,
-                    "chain": CHAIN,
-                    "observed_at": pool["created_at"].isoformat(),
-                    "pool_created_at": pool["created_at"].isoformat(),
-                    "liquidity_usd": str(pool["liquidity"]),
-                },
-                pool["created_at"],
-            )
+            yield self._geboorte(pool)
+
+        volgende_geboorte = (
+            self._start_at + timedelta(minutes=self._new_pool_every)
+            if self._new_pool_every
+            else None
+        )
+        volgnummer = self._pools
 
         moment = self._start_at
         stap = 0
         while moment < einde:
             stap += 1
+
+            if volgende_geboorte is not None and moment >= volgende_geboorte:
+                volgnummer += 1
+                nieuw = self._nieuwe_pool(volgnummer, moment, toeval)
+                pools.append(nieuw)
+                yield self._geboorte(nieuw)
+                volgende_geboorte = moment + timedelta(minutes=self._new_pool_every)
+
+            if self._lifetime is not None:
+                # Een pool die ophoudt, houdt op. Anders groeit het aantal actieve pools
+                # eindeloos en zegt het tickvolume niets meer over een echt universum.
+                pools = [
+                    pool
+                    for pool in pools
+                    if moment - pool["created_at"] < timedelta(minutes=self._lifetime)
+                ]
+
             for index, pool in enumerate(pools):
                 if moment < pool["created_at"]:
                     continue
@@ -147,10 +190,19 @@ class SyntheticPoolSource:
                 ):
                     continue
 
-                beweging = Decimal(str(round(toeval.uniform(-0.04, 0.045), 6)))
+                # Een random walk zonder drift: de prijs wordt met exp(u) vermenigvuldigd
+                # waarbij u symmetrisch om nul ligt, dus de verwachte logbeweging is nul en
+                # de mediaanprijs blijft staan waar hij begon.
+                #
+                # Dit stond eerst fout, en het was geen detail: met (1 + u) en u uit
+                # uniform(-0.04, +0.045) was de logdrift +0,0022 per stap. Over een etmaal
+                # is dat een factor 15.800, en dan wint élke willekeurige instap. De
+                # controlegroep H0 kwam daardoor uit op +8R met een winrate van 100% —
+                # precies het soort cijfer dat er geloofwaardig uitziet en nergens op berust.
+                beweging = Decimal(str(round(toeval.uniform(-0.04, 0.04), 6)))
                 pool["price"] = max(
                     Decimal("0.000000000001"),
-                    (pool["price"] * (Decimal("1") + beweging)).quantize(
+                    (pool["price"] * beweging.exp()).quantize(
                         Decimal("0.000000000001"), rounding=ROUND_HALF_UP
                     ),
                 )

@@ -11,7 +11,7 @@ dan weet je bij een blokkade niet meer welke van de twee de waarheid was.
 
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone  # noqa: F401
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -26,22 +26,19 @@ from app.models.quantlab import (
     QuantRiskControl,
     QuantRiskEvent,
 )
-from app.quantlab.risk import EntryRequest, RiskDecision, RiskSnapshot, evaluate_entry
+from app.quantlab.risk import (
+    EntryRequest,
+    RiskDecision,
+    RiskSnapshot,
+    day_start,
+    evaluate_entry,
+    week_start,
+)
 from app.quantlab.risk_limits import WEEK_LOSS_STOP_R
 
 
-def day_start(now: datetime) -> datetime:
-    """Het begin van de UTC-dag. Eén tijdzone voor alles, anders vervalt een dagstop twee
-    keer per etmaal of helemaal niet."""
-    moment = now.astimezone(timezone.utc)
-    return datetime.combine(moment.date(), time.min, tzinfo=timezone.utc)
-
-
-def week_start(now: datetime) -> datetime:
-    """Maandag 00:00 UTC van de week waarin `now` valt."""
-    begin = day_start(now)
-    return begin - timedelta(days=begin.isoweekday() - 1)
-
+# `day_start` en `week_start` komen uit de pure risicolaag: de engine van fase 3 heeft ze
+# ook nodig en mag de databaselaag niet importeren. Eén definitie, één waarheid.
 
 async def _realized_r(session: AsyncSession, vanaf: datetime) -> Decimal:
     totaal = await session.scalar(

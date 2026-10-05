@@ -13,6 +13,7 @@ bestand leest en faalt zodra iemand dat verandert.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import datetime, time, timedelta, timezone
 from decimal import ROUND_DOWN, Decimal
 from enum import StrEnum
 
@@ -24,6 +25,21 @@ from app.quantlab.risk_limits import (
     RISK_PER_TRADE_PCT,
     WEEK_LOSS_STOP_R,
 )
+
+
+def day_start(now: datetime) -> datetime:
+    """Het begin van de UTC-dag.
+
+    Eén tijdzone voor alles. Zonder dat vervalt een dagstop twee keer per etmaal of
+    helemaal niet, afhankelijk van waar je staat."""
+    moment = now.astimezone(timezone.utc)
+    return datetime.combine(moment.date(), time.min, tzinfo=timezone.utc)
+
+
+def week_start(now: datetime) -> datetime:
+    """Maandag 00:00 UTC van de week waarin `now` valt."""
+    begin = day_start(now)
+    return begin - timedelta(days=begin.isoweekday() - 1)
 
 CENTEN = Decimal("0.01")
 # Stukken worden met acht decimalen gerekend: een memecoin kost soms 0,0000012 euro, en

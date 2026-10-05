@@ -31,7 +31,14 @@ logger = logging.getLogger("ganz.quantlab.data")
 # Hoe ver terug er naar een identiek event wordt gekeken om een dubbele te markeren. Een
 # feed die hetzelfde event na een herverbinding opnieuw stuurt, doet dat binnen seconden;
 # een identieke payload van een uur later is gewoon een nieuw event.
-DUPLICATE_LOOKBACK = 500
+# Hoeveel waarden er in één IN-clausule gaan. PostgreSQL staat hoogstens 32767 parameters
+# per query toe; 5000 is ruim onder die grens en nog steeds één query per vijfduizend.
+IN_CHUNK = 5000
+
+# Hoeveel events `record()` in één keer wegzet. Niet alles in één transactie: bij drie dagen
+# data zijn dat 150.000 rijen in het geheugen van de sessie, en dan wordt de identity map
+# van SQLAlchemy zelf het probleem.
+RECORD_BATCH = 2000
 
 
 class CorpusBroken(RuntimeError):
@@ -104,50 +111,88 @@ async def store_events(
     Geeft het aantal bytes terug dat erin ging, zodat de Scout de groei kan bijhouden
     zonder er een aparte query voor te doen.
     """
+    lijst = list(events)
+    if not lijst:
+        return 0
+
     seq = await _volgende_seq(session)
     vorige = await _laatste_chain(session)
     bytes_totaal = 0
 
-    for event in events:
+    # De dubbele events in een query opzoeken en niet een per event. Dat laatste stond er
+    # eerst, en het was geen detail: bij een corpus van 150.000 events waren dat 150.000
+    # losse SELECTs, en dan duurt het opnemen van drie dagen data langer dan die drie
+    # dagen zelf. Nu een query voor de hele batch, plus de hashes binnen de batch zelf.
+    afdrukken = {canonical_hash(event.payload_raw) for event in lijst}
+    bekend = await _bestaande_hashes(session, lijst[0].source, afdrukken)
+
+    # Pas na het flushen hebben de nieuwe rijen een id, dus de eerste van een dubbel paar
+    # binnen deze batch wordt per hash onthouden en achteraf gekoppeld.
+    eerste_in_batch: dict[str, QuantRawEvent] = {}
+    te_koppelen: list[tuple[QuantRawEvent, str]] = []
+
+    for event in lijst:
         payload_hash = canonical_hash(event.payload_raw)
         vorige = chain_step(vorige, payload_hash)
-        dubbel_van = await _zoek_dubbele(session, event, payload_hash)
-        session.add(
-            QuantRawEvent(
-                seq=seq,
-                source=event.source,
-                stream=event.stream,
-                payload_raw=event.payload_raw,
-                payload_hash=payload_hash,
-                chain_hash=vorige,
-                received_at=event.received_at,
-                duplicate_of_id=dubbel_van,
-                ingest_run_id=ingest_run_id,
-            )
+        rij = QuantRawEvent(
+            seq=seq,
+            source=event.source,
+            stream=event.stream,
+            payload_raw=event.payload_raw,
+            payload_hash=payload_hash,
+            chain_hash=vorige,
+            received_at=event.received_at,
+            duplicate_of_id=bekend.get((event.stream, payload_hash)),
+            ingest_run_id=ingest_run_id,
         )
+        sleutel = f"{event.stream}:{payload_hash}"
+        if rij.duplicate_of_id is None:
+            eerder = eerste_in_batch.get(sleutel)
+            if eerder is None:
+                eerste_in_batch[sleutel] = rij
+            else:
+                te_koppelen.append((rij, sleutel))
+        session.add(rij)
         bytes_totaal += len(event.payload_raw.encode("utf-8"))
         seq += 1
 
     await session.flush()
+    for rij, sleutel in te_koppelen:
+        rij.duplicate_of_id = eerste_in_batch[sleutel].id
+    if te_koppelen:
+        await session.flush()
     return bytes_totaal
 
 
-async def _zoek_dubbele(
-    session: AsyncSession, event: RawEvent, payload_hash: str
-) -> int | None:
-    """Staat dit event er al? Dan de eerste aanwijzen, maar niets weggooien."""
-    recent = (
-        select(QuantRawEvent.id)
-        .where(
-            QuantRawEvent.source == event.source,
-            QuantRawEvent.stream == event.stream,
-            QuantRawEvent.payload_hash == payload_hash,
-            QuantRawEvent.duplicate_of_id.is_(None),
+async def _bestaande_hashes(
+    session: AsyncSession, source: str, afdrukken: set[str]
+) -> dict[tuple[str, str], int]:
+    """Welke van deze afdrukken staan er al, en onder welk id.
+
+    Alleen de eerste exemplaren (`duplicate_of_id IS NULL`), want daar wijst een dubbele
+    naar. Niets wordt weggegooid: de ruwe opslag is append-only en een dubbele wordt
+    alleen gemarkeerd.
+    """
+    uit: dict[tuple[str, str], int] = {}
+    if not afdrukken:
+        return uit
+    # In stukken, want PostgreSQL staat hoogstens 32767 parameters per query toe. Dat
+    # liep bij een corpus van drie dagen stuk, en SQLite had het nooit laten zien — een
+    # argument om dit soort dingen tegen de echte database te proberen.
+    lijst = list(afdrukken)
+    for begin in range(0, len(lijst), IN_CHUNK):
+        rijen = await session.execute(
+            select(QuantRawEvent.stream, QuantRawEvent.payload_hash, QuantRawEvent.id)
+            .where(
+                QuantRawEvent.source == source,
+                QuantRawEvent.payload_hash.in_(lijst[begin : begin + IN_CHUNK]),
+                QuantRawEvent.duplicate_of_id.is_(None),
+            )
+            .order_by(QuantRawEvent.seq)
         )
-        .order_by(QuantRawEvent.seq.desc())
-        .limit(1)
-    )
-    return await session.scalar(recent)
+        for stream, afdruk, rij_id in rijen.all():
+            uit.setdefault((stream, afdruk), rij_id)
+    return uit
 
 
 async def verify_chain(session: AsyncSession) -> ChainCheck:
@@ -223,18 +268,14 @@ async def _normaliseer_rij(
 
 async def normalize_pending(session: AsyncSession) -> tuple[int, int]:
     """Normaliseer alles wat nog geen tick heeft. Geeft (ticks, mislukt) terug."""
-    al_gedaan = select(QuantMarketTick.raw_event_id).distinct()
-    rijen = (
-        (
-            await session.execute(
-                select(QuantRawEvent)
-                .where(QuantRawEvent.id.not_in(al_gedaan))
-                .order_by(QuantRawEvent.seq)
-            )
-        )
-        .scalars()
-        .all()
-    )
+    # Alles vanaf het hoogste ruwe event dat al een tick heeft. Dat werkt omdat er altijd
+    # in volgorde wordt genormaliseerd. De NOT IN-subquery die hier eerst stond, las bij
+    # elke batch de hele tickstabel opnieuw.
+    gedaan_tot = await session.scalar(select(func.max(QuantMarketTick.raw_event_id)))
+    query = select(QuantRawEvent).order_by(QuantRawEvent.seq)
+    if gedaan_tot is not None:
+        query = query.where(QuantRawEvent.id > gedaan_tot)
+    rijen = (await session.execute(query)).scalars().all()
     ticks = mislukt = 0
     for rij in rijen:
         gemaakt, fout = await _normaliseer_rij(session, rij, normalizer_for(rij.source))
@@ -261,9 +302,27 @@ async def record(session: AsyncSession, *, source: FeedSource) -> IngestResult:
     session.add(run)
     await session.flush()
 
-    events = [event async for event in source.events()]
-    bytes_totaal = await store_events(session, events, ingest_run_id=run.id)
-    ticks, mislukt = await normalize_pending(session)
+    aantal = ticks = mislukt = 0
+    bytes_totaal = 0
+    batch: list[RawEvent] = []
+
+    async def wegschrijven() -> None:
+        nonlocal batch, bytes_totaal, ticks, mislukt
+        if not batch:
+            return
+        bytes_totaal += await store_events(session, batch, ingest_run_id=run.id)
+        nieuwe, fout = await normalize_pending(session)
+        ticks += nieuwe
+        mislukt += fout
+        batch = []
+
+    async for event in source.events():
+        batch.append(event)
+        aantal += 1
+        if len(batch) >= RECORD_BATCH:
+            await wegschrijven()
+    await wegschrijven()
+
     dubbel = int(
         await session.scalar(
             select(func.count())
@@ -276,7 +335,7 @@ async def record(session: AsyncSession, *, source: FeedSource) -> IngestResult:
         or 0
     )
 
-    run.events = len(events)
+    run.events = aantal
     run.ticks = ticks
     run.duplicates = dubbel
     run.parse_failures = mislukt
@@ -286,7 +345,7 @@ async def record(session: AsyncSession, *, source: FeedSource) -> IngestResult:
     await session.flush()
 
     return IngestResult(
-        events=len(events),
+        events=aantal,
         ticks=ticks,
         duplicates=dubbel,
         parse_failures=mislukt,
@@ -521,25 +580,29 @@ async def prune_raw_events(session: AsyncSession, *, older_than: datetime | None
             "Opruimen vraagt een expliciete grens: zonder datum zou dit het hele "
             "replay-corpus weggooien."
         )
-    ids = (
-        (
-            await session.execute(
-                select(QuantRawEvent.id).where(QuantRawEvent.received_at < older_than)
-            )
+    aantal = int(
+        await session.scalar(
+            select(func.count())
+            .select_from(QuantRawEvent)
+            .where(QuantRawEvent.received_at < older_than)
         )
-        .scalars()
-        .all()
+        or 0
     )
-    if not ids:
+    if not aantal:
         return 0
-    # De ticks hangen met ON DELETE CASCADE aan de ruwe rijen, maar SQLite doet dat alleen
-    # met foreign keys aan; expliciet weghalen werkt op beide databases hetzelfde.
+    # Een subquery en geen lijst met ids: bij een maand data zijn dat miljoenen parameters,
+    # en PostgreSQL staat er 32767 toe. De ticks hangen met ON DELETE CASCADE aan de ruwe
+    # rijen, maar SQLite doet dat alleen met foreign keys aan; expliciet weghalen werkt op
+    # beide databases hetzelfde.
+    oud = select(QuantRawEvent.id).where(QuantRawEvent.received_at < older_than)
     await session.execute(
-        delete(QuantMarketTick).where(QuantMarketTick.raw_event_id.in_(ids))
+        delete(QuantMarketTick).where(QuantMarketTick.raw_event_id.in_(oud))
     )
-    await session.execute(delete(QuantRawEvent).where(QuantRawEvent.id.in_(ids)))
+    await session.execute(
+        delete(QuantRawEvent).where(QuantRawEvent.received_at < older_than)
+    )
     await session.flush()
-    return len(ids)
+    return aantal
 
 
 async def recent_runs(

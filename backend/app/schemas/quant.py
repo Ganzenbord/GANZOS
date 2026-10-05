@@ -168,3 +168,128 @@ class IngestRunOut(BaseModel):
     duplicates: int
     parse_failures: int
     bytes_stored: int
+
+
+# --- De papieren handel (fase 3) ---------------------------------------------
+
+
+class HypothesisOut(BaseModel):
+    """Een geregistreerde hypothese. De brontekst zit er niet in: die is lang, en wie hem
+    wil lezen vraagt hem per hypothese op."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    version: str
+    content_hash: str
+    statement: str
+    paper_only: bool
+    source_path: str | None
+    registered_at: UtcDatetime
+
+
+class HypothesisDetailOut(HypothesisOut):
+    source_yaml: str
+
+
+class StrategyRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    hypothesis_id: int
+    variant: str
+    seed: int
+    corpus_digest: str
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None
+    ticks: int
+    signals_proposed: int
+    trades_opened: int
+    trades_closed: int
+    trades_force_closed: int
+    equity_quote: Decimal
+    one_r_quote: Decimal
+    usd_eur_rate: Decimal
+    realized_r: Decimal
+    max_drawdown_r: Decimal
+    max_open_risk_r: Decimal
+    total_fees_usd: Decimal
+    total_slippage_usd: Decimal
+    safety_oracle: str
+    skipped_by_reason: dict[str, int] | None
+
+
+class PaperTradeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    run_id: int
+    pool_address: str
+    token_address: str
+    opened_at: UtcDatetime
+    closed_at: UtcDatetime | None
+    entry_reason: str
+    exit_reason: str | None
+    risk_r: Decimal
+    units: Decimal
+    entry_expected_price: Decimal
+    entry_fill_price: Decimal
+    stop_price: Decimal
+    exit_quote_usd: Decimal
+    fees_usd: Decimal
+    slippage_usd: Decimal
+    latency_cost_usd: Decimal
+    pnl_usd: Decimal | None
+    r_multiple: Decimal | None
+
+
+class PaperFillOut(BaseModel):
+    """Verwacht, markt, fill — in die volgorde te lezen als: wat je wilde, wat de markt
+    deed in de tussentijd, en wat je werkelijk kreeg."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    sequence: int
+    kind: str
+    reason: str
+    requested_at: UtcDatetime
+    filled_at: UtcDatetime
+    latency_ms: float
+    filled: bool
+    failure_reason: str | None
+    expected_price: Decimal
+    market_price: Decimal | None
+    fill_price: Decimal
+    units: Decimal
+    quote_usd: Decimal
+    slippage_usd: Decimal
+    latency_cost_usd: Decimal
+    fee_usd: Decimal
+    exit_haircut_applied: bool
+
+
+class SignalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    run_id: int
+    pool_address: str
+    observed_at: UtcDatetime
+    price_usd: Decimal | None
+    taken: bool
+    reason: str
+    detail: str | None
+
+
+class ExpectancyOut(BaseModel):
+    n: int
+    expectancy_r: Decimal | None
+    ci_low: Decimal | None
+    ci_high: Decimal | None
+    confidence: Decimal
+    win_rate: Decimal | None
+    conclusion_allowed: bool
+    min_trades: int
+    verdict: str

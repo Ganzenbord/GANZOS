@@ -1,0 +1,101 @@
+# H0_v1 — de controlegroep.
+#
+# Dit is de ruisvloer. H0 stapt willekeurig in, uit hetzelfde universum als H1, met
+# identieke exits, identieke sizing en identiek kostenmodel. Het enige verschil is dat er
+# geen enkele reden achter de instap zit.
+#
+# Waarom dit bestaat: elke strategie levert winsten op. De vraag is of ze meer opleveren dan
+# willekeur. Een H1 die H0 niet aantoonbaar verslaat, heeft geen edge — hoe mooi de curve
+# er ook uitziet.
+#
+# LET OP: dit bestand is vastgelegd en gehasht. Wijzigen betekent een nieuwe versie
+# (H0_v2) en de trade-teller begint opnieuw. Dat is met opzet onhandig: het voorkomt dat
+# er achteraf aan de knoppen wordt gedraaid tot het resultaat bevalt.
+
+name: H0
+version: v1
+statement: >
+  Willekeurig instappen in hetzelfde universum, met dezelfde exits en dezelfde kosten als
+  H1, levert een expectancy van nul op na kosten. Dit is de ruisvloer waar H1 tegen wordt
+  afgemeten.
+paper_only: true
+
+universe:
+  chain: synthetic          # nog geen echte chain aangesloten; zie het fase 2-rapport
+  venue_any: true
+  min_liquidity_usd: 1000
+
+# De veiligheidsfilters houden het systeem in leven en zijn geen edge. H0 gebruikt ze
+# daarom net zo goed als H1: anders vergelijk je twee verschillende universums.
+safety_filters:
+  require_lp_burned_or_locked_days: 30
+  require_mint_authority_revoked: true
+  require_freeze_authority_revoked: true
+  max_top10_holder_share: 0.20
+  min_liquidity_multiple_of_position: 50
+  # Kan de verkoopbaarheid niet technisch worden geverifieerd, dan gaat het token eruit en
+  # wordt het geteld. Niet "waarschijnlijk wel goed".
+  exclude_when_sellability_unverified: true
+
+entry:
+  kind: random
+  # Hoeveel instappen per uur de controlegroep probeert. Dit is geen edge-parameter maar een
+  # steekproefgrootte: hoger betekent sneller een bruikbare N, niet een beter resultaat.
+  attempts_per_hour: 6
+  min_token_age_minutes: 5
+  max_token_age_minutes: 30
+
+exit:
+  # De stop staat op -1R. Hoe ver de stop in prijs onder de instap ligt, bepaalt samen met
+  # 1R hoe groot de positie is.
+  #
+  # DIT GETAL IS NIET GEVERIFIEERD. De opdracht noemt "-1R" maar geen afstand, en een
+  # afstand moet er zijn. 25% is een ongetuned startwaarde voor een token van minuten oud.
+  # Zie de open vraag in docs/quant-lab/phase3-report.md.
+  stop_distance_pct: 0.25
+  take_half_at_r: 2.0
+  trailing_stop_pct: 0.20
+  max_hold_minutes: 240
+
+sizing:
+  risk_per_trade_r: 1.0
+  # 1R zelf staat niet hier maar als constante in app/quantlab/risk_limits.py (0,75% van de
+  # papieren equity). Een hypothese mag de risicolaag niet kunnen verzetten.
+
+# Het kostenmodel. GEEN ENKELE WAARDE HIERONDER IS GEVERIFIEERD: de netwerkpolicy laat geen
+# bron door, dus ik heb niets kunnen nameten. Daarom staat bij elke waarde in
+# `cost_model_provenance` waar hij vandaan komt en wat er nodig is om hem te verifiëren.
+# De stresstest (2x slippage, 2x latency) is er juist om te laten zien hoe gevoelig een
+# resultaat voor deze getallen is.
+cost_model:
+  swap_fee_bps: 30
+  priority_fee_usd: 0.05
+  network_fee_usd: 0.001
+  failure_probability: 0.05
+  latency_p50_ms: 800
+  latency_p95_ms: 3000
+  exit_haircut_bps: 150
+  exit_haircut_above_pool_share: 0.01
+
+cost_model_provenance:
+  swap_fee_bps: "niet geverifieerd — gangbare AMM-fee; na te meten in de pooldocumentatie van de venue"
+  priority_fee_usd: "niet geverifieerd — hangt af van de drukte op de chain; na te meten uit echte transacties"
+  network_fee_usd: "niet geverifieerd — basis-transactiekosten; na te lezen in de chaindocumentatie"
+  failure_probability: "niet geverifieerd — na te meten uit het aandeel mislukte transacties in echte data"
+  latency_p50_ms: "niet geverifieerd — na te meten tussen signaal en bevestigde transactie"
+  latency_p95_ms: "niet geverifieerd — idem, staartwaarde"
+  exit_haircut_bps: "niet geverifieerd — bewust conservatief; in paniek krijg je slechter dan de AMM-curve"
+  exit_haircut_above_pool_share: "niet geverifieerd — drempel waarboven de haircut geldt"
+
+kill_criteria:
+  min_trades_for_conclusion: 150
+  max_drawdown_r: 30
+  # H0 is de controlegroep en wordt niet "gestopt" op expectancy: hij hoort rond nul uit te
+  # komen. Komt H0 ver boven nul, dan is dat geen goede strategie maar een aanwijzing dat
+  # het kostenmodel te mild staat.
+  expectancy_ci_lower_bound_must_exceed: null
+
+success_criteria: >
+  H0 is geslaagd als hij betrouwbaar draait en een expectancy oplevert die binnen zijn
+  betrouwbaarheidsinterval nul bevat. Een H0 die geld verdient, betekent dat de kosten te
+  laag staan — niet dat willekeur werkt.

@@ -149,6 +149,14 @@ def test_geen_enkel_responsemodel_heeft_een_veld_dat_naar_een_geheim_ruikt() -> 
         ("LlmCallOut", "input_tokens"),
         ("LlmCallOut", "output_tokens"),
         ("LlmCallOut", "cache_read_tokens"),
+        # De hash van een hypothese-bestand. Die hóórt openbaar te zijn: dat is het hele
+        # punt van pre-registratie — je moet kunnen nakijken dat het bestand niet is
+        # veranderd. Het bestand staat zelf in de repository.
+        ("HypothesisOut", "content_hash"),
+        ("HypothesisDetailOut", "content_hash"),
+        # "token" in de betekenis van een munt op een chain, niet van een inlogtoken. Een
+        # tokenadres is openbare informatie en staat op elke blockexplorer.
+        ("PaperTradeOut", "token_address"),
     }
     verdacht = re.compile(
         r"(secret|password|credential|api_key|_hash|token|embedding$)", re.IGNORECASE

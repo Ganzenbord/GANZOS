@@ -9,7 +9,7 @@ Vijf tabellen, en ze horen bij elkaar in twee groepen:
 - **kosten** — `quant_llm_calls`, het kostenboek: elke aanroep van een model met tokens,
   dollars, euro's en de koers waarmee is gerekend.
 
-Fase 2 heeft er drie bij gezet, en die horen bij elkaar in een derde groep:
+Fase 2 en 3 hebben er zeven bij gezet, in twee groepen:
 
 - **data** — `quant_raw_events` (de ruwe feed, append-only, met een hashketting),
   `quant_market_ticks` (dezelfde events genormaliseerd, volledig herbouwbaar uit de ruwe
@@ -39,12 +39,14 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Float,
     ForeignKey,
     Index,
     Integer,
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -278,3 +280,174 @@ class QuantIngestRun(Base):
     parse_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     bytes_stored: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+# --- De papieren handel (fase 3) ---------------------------------------------
+
+
+class QuantHypothesis(Base):
+    """Een hypothese, vastgelegd en gehasht vóór de eerste run (sectie 8).
+
+    De brontekst staat er volledig in, niet alleen de hash. Een hash zonder de tekst zegt
+    alleen dát er iets veranderd is; met de tekst kun je over een half jaar nalezen waarom
+    een waarde zo stond. Het commentaar in het bestand hoort daar expliciet bij.
+
+    Wijzigen betekent een nieuwe versie: `(name, version)` is uniek, en een registratie met
+    dezelfde versie maar andere inhoud wordt geweigerd.
+    """
+
+    __tablename__ = "quant_hypotheses"
+    __table_args__ = (UniqueConstraint("name", "version", name="uq_quant_hypothesis_version"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(20), nullable=False)
+    version: Mapped[str] = mapped_column(String(20), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    statement: Mapped[str] = mapped_column(Text, nullable=False)
+    paper_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    source_yaml: Mapped[str] = mapped_column(Text, nullable=False)
+    source_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    registered_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, default=utcnow, server_default=func.now(), nullable=False
+    )
+
+
+class QuantStrategyRun(Base):
+    """Eén run van één hypothese in één stressvariant.
+
+    `corpus_digest` is de afdruk van de ruwe opslag op het moment van de run. Daarmee hangt
+    een resultaat aan een exact corpus: zonder dat is "expectancy 0,3R" een getal zonder
+    vraag waar het over ging.
+    """
+
+    __tablename__ = "quant_strategy_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    hypothesis_id: Mapped[int] = mapped_column(
+        ForeignKey("quant_hypotheses.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    variant: Mapped[str] = mapped_column(String(20), nullable=False, default="base")
+    seed: Mapped[int] = mapped_column(Integer, nullable=False)
+    corpus_digest: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+    ticks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    signals_proposed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    trades_opened: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    trades_closed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Posities die aan het eind van het corpus nog openstonden en op de laatst bekende
+    # prijs zijn gesloten. Geen uitstap volgens een regel, dus apart geteld: anders zou
+    # je ze voor echte exits aanzien.
+    trades_force_closed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    equity_quote: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
+    one_r_quote: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    usd_eur_rate: Mapped[Decimal] = mapped_column(Numeric(12, 6), nullable=False)
+    realized_r: Mapped[Decimal] = mapped_column(R_MULTIPLE, nullable=False, default=0)
+    max_drawdown_r: Mapped[Decimal] = mapped_column(R_MULTIPLE, nullable=False, default=0)
+    max_open_risk_r: Mapped[Decimal] = mapped_column(R_MULTIPLE, nullable=False, default=0)
+    total_fees_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    total_slippage_usd: Mapped[Decimal] = mapped_column(
+        Numeric(20, 6), nullable=False, default=0
+    )
+    safety_oracle: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    skipped_by_reason: Mapped[dict[str, Any] | None] = mapped_column(
+        NullableJSON, nullable=True
+    )
+    note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class QuantSignal(Base):
+    """Elk signaal, genomen én overgeslagen, met de reden erbij.
+
+    Sectie 10 vraagt dit expliciet: zonder de overgeslagen signalen kun je achteraf elke
+    uitkomst mooi praten door te vergeten wat je hebt laten lopen. En je kunt niet meten of
+    een filter geld heeft bespaard of kansen heeft gekost.
+    """
+
+    __tablename__ = "quant_signals"
+    __table_args__ = (Index("ix_quant_signals_run_taken", "run_id", "taken"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("quant_strategy_runs.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    pool_address: Mapped[str] = mapped_column(String(80), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    price_usd: Mapped[Decimal | None] = mapped_column(PRICE, nullable=True)
+    taken: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    reason: Mapped[str] = mapped_column(String(40), nullable=False)
+    detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class QuantPaperTrade(Base):
+    """Eén papieren positie, van instap tot sluiting.
+
+    Er wordt in dit project niet live gehandeld: elke rij hier is een simulatie.
+    """
+
+    __tablename__ = "quant_paper_trades"
+    __table_args__ = (Index("ix_quant_paper_trades_run_pool", "run_id", "pool_address"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("quant_strategy_runs.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    pool_address: Mapped[str] = mapped_column(String(80), nullable=False)
+    token_address: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+
+    opened_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True, nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    entry_reason: Mapped[str] = mapped_column(String(60), nullable=False)
+    exit_reason: Mapped[str | None] = mapped_column(String(60), nullable=True)
+
+    risk_r: Mapped[Decimal] = mapped_column(R_MULTIPLE, nullable=False)
+    risk_quote: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    units: Mapped[Decimal] = mapped_column(Numeric(30, 8), nullable=False)
+    entry_expected_price: Mapped[Decimal] = mapped_column(PRICE, nullable=False)
+    entry_fill_price: Mapped[Decimal] = mapped_column(PRICE, nullable=False)
+    stop_price: Mapped[Decimal] = mapped_column(PRICE, nullable=False)
+    exit_quote_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    fees_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    slippage_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    latency_cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(20, 6), nullable=False, default=0
+    )
+    pnl_usd: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+    r_multiple: Mapped[Decimal | None] = mapped_column(R_MULTIPLE, nullable=True)
+
+
+class QuantPaperFill(Base):
+    """Eén order binnen een trade: verwacht, gesimuleerd, en wat ertussen zat.
+
+    De vier prijzen staan er allemaal, want "de fill was slechter" is een nutteloze
+    mededeling als je niet weet of dat door de klok, de pooldiepte of de fee kwam.
+    """
+
+    __tablename__ = "quant_paper_fills"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    trade_id: Mapped[int] = mapped_column(
+        ForeignKey("quant_paper_trades.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    reason: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    requested_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    filled_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    latency_ms: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    filled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    failure_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    expected_price: Mapped[Decimal] = mapped_column(PRICE, nullable=False)
+    market_price: Mapped[Decimal | None] = mapped_column(PRICE, nullable=True)
+    fill_price: Mapped[Decimal] = mapped_column(PRICE, nullable=False, default=0)
+    units: Mapped[Decimal] = mapped_column(Numeric(30, 8), nullable=False, default=0)
+    quote_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    slippage_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    latency_cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(20, 6), nullable=False, default=0
+    )
+    fee_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
+    exit_haircut_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

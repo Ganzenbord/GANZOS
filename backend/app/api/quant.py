@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_confirmation, require_permission
@@ -30,19 +30,31 @@ from app.quantlab.dataquality import CHECK_UITLEG, DataCheck, QualityVerdict
 from app.quantlab.risk import VETO_UITLEG, RiskSnapshot, RiskVeto, one_r_eur
 from app.schemas.quant import (
     AgentSpendOut,
+    ExpectancyOut,
+    HypothesisDetailOut,
+    HypothesisOut,
     BudgetStatusOut,
     ControlIn,
     DataCheckOut,
     DataQualityOut,
     IngestRunOut,
+    PaperFillOut,
+    PaperTradeOut,
     KillSwitchOut,
     LlmCallOut,
     RiskEventOut,
     RiskLimitsOut,
     RiskStatusOut,
+    SignalOut,
     StorageOut,
+    StrategyRunOut,
 )
-from app.services import quant_cost_service, quant_data_service, quant_risk_service
+from app.services import (
+    quant_cost_service,
+    quant_data_service,
+    quant_paper_service,
+    quant_risk_service,
+)
 from app.services.activity_service import log_activity
 
 router = APIRouter(prefix="/quant", tags=["quant"])
@@ -337,3 +349,119 @@ async def data_runs(
 ):
     """Wat de Scout wanneer heeft opgenomen, en waarom hij stopte."""
     return list(await quant_data_service.recent_runs(session, limit=limit))
+
+
+# --- De papieren handel (fase 3) ---------------------------------------------
+
+NIET_GEVONDEN = HTTPException(status.HTTP_404_NOT_FOUND, "Dit bestaat niet")
+
+
+@router.get("/hypotheses", response_model=list[HypothesisOut])
+async def hypotheses(
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """De geregistreerde hypotheses, met hun hash.
+
+    Die hash is het hele punt van pre-registratie: hij hangt aan de tekst van het bestand,
+    dus je kunt zien of er iets is veranderd sinds de eerste run."""
+    return list(await quant_paper_service.list_hypotheses(session))
+
+
+@router.get("/hypotheses/{hypothesis_id}", response_model=HypothesisDetailOut)
+async def hypothesis_detail(
+    hypothesis_id: int,
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """Eén hypothese, met het hele bestand erbij — commentaar incluis.
+
+    Dat commentaar legt uit waarom een waarde zo staat, en het telt mee in de hash. Het is
+    dus onderdeel van de registratie en niet een bijlage."""
+    from app.models.quantlab import QuantHypothesis
+
+    rij = await session.get(QuantHypothesis, hypothesis_id)
+    if rij is None:
+        raise NIET_GEVONDEN
+    return rij
+
+
+@router.get("/paper/runs", response_model=list[StrategyRunOut])
+async def paper_runs(
+    limit: int = Query(default=20, ge=1, le=200),
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """De runs, met de afdruk van het corpus waar ze tegen draaiden."""
+    return list(await quant_paper_service.recent_runs(session, limit=limit))
+
+
+@router.get("/paper/runs/{run_id}/expectancy", response_model=ExpectancyOut)
+async def paper_expectancy(
+    run_id: int,
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """De expectancy van een run, met N en een betrouwbaarheidsinterval.
+
+    Onder de drempel uit de hypothese staat hier "te vroeg". Dat is geen bescheidenheid
+    maar rekenkunde: met twintig trades past bijna elke werkelijkheid in het interval."""
+    from app.models.quantlab import QuantStrategyRun
+
+    if await session.get(QuantStrategyRun, run_id) is None:
+        raise NIET_GEVONDEN
+    uitslag = await quant_paper_service.run_expectancy(session, run_id=run_id)
+    return ExpectancyOut(
+        n=uitslag.n,
+        expectancy_r=uitslag.expectancy_r,
+        ci_low=uitslag.ci_low,
+        ci_high=uitslag.ci_high,
+        confidence=uitslag.confidence,
+        win_rate=uitslag.win_rate,
+        conclusion_allowed=uitslag.conclusion_allowed,
+        min_trades=uitslag.min_trades,
+        verdict=uitslag.verdict,
+    )
+
+
+@router.get("/paper/runs/{run_id}/skipped", response_model=list[SignalOut])
+async def paper_skipped(
+    run_id: int,
+    limit: int = Query(default=50, ge=1, le=500),
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """De signalen die níét zijn genomen, met de reden.
+
+    Sectie 10 vraagt dit expliciet, en met reden: zonder deze lijst kun je achteraf elke
+    uitkomst mooi praten door te vergeten wat je hebt laten lopen."""
+    return list(await quant_paper_service.skipped_signals(session, run_id=run_id, limit=limit))
+
+
+@router.get("/paper/trades", response_model=list[PaperTradeOut])
+async def paper_trades(
+    run_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    return list(
+        await quant_paper_service.recent_trades(session, run_id=run_id, limit=limit)
+    )
+
+
+@router.get("/paper/trades/{trade_id}/fills", response_model=list[PaperFillOut])
+async def paper_trade_fills(
+    trade_id: int,
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """Verwachte versus gesimuleerde fill, per order.
+
+    De vier prijzen staan er allemaal, want "de fill was slechter" zegt niets als je niet
+    weet of dat door de klok, de pooldiepte of de fee kwam."""
+    from app.models.quantlab import QuantPaperTrade
+
+    if await session.get(QuantPaperTrade, trade_id) is None:
+        raise NIET_GEVONDEN
+    return list(await quant_paper_service.trade_fills(session, trade_id=trade_id))
