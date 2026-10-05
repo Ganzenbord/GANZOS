@@ -26,18 +26,23 @@ from app.quantlab import risk_limits
 from app.quantlab.agents import AGENT_UITLEG
 from app.quantlab.budget import MODE_UITLEG
 from app.quantlab.budget_limits import RESERVE_EUR
+from app.quantlab.dataquality import CHECK_UITLEG, DataCheck, QualityVerdict
 from app.quantlab.risk import VETO_UITLEG, RiskSnapshot, RiskVeto, one_r_eur
 from app.schemas.quant import (
     AgentSpendOut,
     BudgetStatusOut,
     ControlIn,
+    DataCheckOut,
+    DataQualityOut,
+    IngestRunOut,
     KillSwitchOut,
     LlmCallOut,
     RiskEventOut,
     RiskLimitsOut,
     RiskStatusOut,
+    StorageOut,
 )
-from app.services import quant_cost_service, quant_risk_service
+from app.services import quant_cost_service, quant_data_service, quant_risk_service
 from app.services.activity_service import log_activity
 
 router = APIRouter(prefix="/quant", tags=["quant"])
@@ -252,3 +257,83 @@ async def cost_calls(
     """Het kostenboek zelf. Met de tokens erbij, want "waarom werd dit duurder" is altijd
     een vraag over hoeveel context erin ging."""
     return await quant_cost_service.recent_calls(session, limit=limit)
+
+
+# --- De datalaag (fase 2) ----------------------------------------------------
+
+
+@router.get("/data/quality", response_model=DataQualityOut)
+async def data_quality(
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """Het datakwaliteitsrapport, met de ketting van de ruwe opslag erbij.
+
+    De ketting staat er niet voor niets naast de bevindingen: een rapport over data die
+    onderweg is veranderd, zegt niets over de data die er oorspronkelijk stond."""
+    rapport = await quant_data_service.quality(session)
+    ketting = await quant_data_service.verify_chain(session)
+    gevonden = {bevinding.check: bevinding for bevinding in rapport.findings}
+    return DataQualityOut(
+        verdict=rapport.verdict.value,
+        explanation=rapport.explanation,
+        ticks=rapport.ticks,
+        raw_events=rapport.raw_events,
+        pools=rapport.pools,
+        synthetic_events=rapport.synthetic_events,
+        first_observed_at=rapport.first_observed_at,
+        last_observed_at=rapport.last_observed_at,
+        chain_ok=ketting.ok,
+        chain_explanation=ketting.explanation,
+        findings=[_check_out(b.check, b) for b in rapport.findings],
+        checks=[_check_out(check, gevonden.get(check)) for check in DataCheck],
+    )
+
+
+def _check_out(check: DataCheck, bevinding=None) -> DataCheckOut:
+    if bevinding is None:
+        return DataCheckOut(
+            check=check.value,
+            count=0,
+            severity=QualityVerdict.OK.value,
+            explanation=CHECK_UITLEG[check],
+            examples=[],
+        )
+    return DataCheckOut(
+        check=check.value,
+        count=bevinding.count,
+        severity=bevinding.severity.value,
+        explanation=bevinding.explanation,
+        examples=list(bevinding.examples),
+    )
+
+
+@router.get("/data/storage", response_model=StorageOut)
+async def data_storage(
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """Hoeveel er staat en hoeveel het per dag wordt. Gemeten, niet geschat."""
+    stand = await quant_data_service.storage_report(session)
+    return StorageOut(
+        events=stand.events,
+        ticks=stand.ticks,
+        bytes_stored=stand.bytes_stored,
+        bytes_per_event=stand.bytes_per_event,
+        measured_seconds=stand.measured_seconds,
+        first_received_at=stand.first_received_at,
+        last_received_at=stand.last_received_at,
+        projected_bytes_per_day=stand.projected_bytes_per_day,
+        projected_bytes_per_month=stand.projected_bytes_per_month,
+        explanation=stand.explanation,
+    )
+
+
+@router.get("/data/runs", response_model=list[IngestRunOut])
+async def data_runs(
+    limit: int = Query(default=20, ge=1, le=200),
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """Wat de Scout wanneer heeft opgenomen, en waarom hij stopte."""
+    return list(await quant_data_service.recent_runs(session, limit=limit))

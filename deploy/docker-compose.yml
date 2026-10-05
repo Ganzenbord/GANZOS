@@ -55,6 +55,32 @@ services:
     # database op een moment dat je er niet naar kijkt. De opdracht staat in docs/server.md:
     #   docker compose run --rm api alembic upgrade head
 
+  # De Scout van het Quant Lab, in zijn eigen container. Met opzet niet in de api-container
+  # en niet als taak in de scheduler daarvan: die draait in hetzelfde proces als de
+  # verzoeken, heeft zijn jobstore in het geheugen, en een gat in een append-only corpus
+  # kun je nooit meer vullen. Zie docs/quant-lab/phase2-report.md.
+  #
+  # Standaard uit: er is nog geen echte databron aangesloten. Aanzetten met
+  #   docker compose --profile quant up -d
+  quant-scout:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    profiles: ["quant"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GANZ_ENVIRONMENT: production
+      GANZ_DATABASE_URL: postgresql+asyncpg://ganz:${POSTGRES_PASSWORD}@db:5432/ganz
+      GANZ_SECRET_KEY: ${GANZ_SECRET_KEY:?zet GANZ_SECRET_KEY in /etc/ganz/ganz.env}
+      GANZ_ENCRYPTION_KEY: ${GANZ_ENCRYPTION_KEY:?zet GANZ_ENCRYPTION_KEY in /etc/ganz/ganz.env}
+    command: ["python", "-m", "scripts.quant_scout", "--source", "${GANZ_QUANT_SOURCE:-synthetic}"]
+    # SIGTERM laat de Scout zijn laatste batch wegschrijven en de run dichtzetten met een
+    # reden. Zonder die marge staat er na elke herstart een run open zonder eindtijd.
+    stop_grace_period: 30s
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped

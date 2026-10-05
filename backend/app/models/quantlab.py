@@ -9,6 +9,12 @@ Vijf tabellen, en ze horen bij elkaar in twee groepen:
 - **kosten** — `quant_llm_calls`, het kostenboek: elke aanroep van een model met tokens,
   dollars, euro's en de koers waarmee is gerekend.
 
+Fase 2 heeft er drie bij gezet, en die horen bij elkaar in een derde groep:
+
+- **data** — `quant_raw_events` (de ruwe feed, append-only, met een hashketting),
+  `quant_market_ticks` (dezelfde events genormaliseerd, volledig herbouwbaar uit de ruwe
+  tabel) en `quant_ingest_runs` (wat de Scout wanneer heeft opgenomen).
+
 Twee dingen die afwijken van de rest van Ganz, en waarom:
 
 1. **Geen `user_id`.** Dit is één lab, niet een lab per gebruiker. De equity, de risicolaag
@@ -30,7 +36,17 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, NullableJSON, TimestampMixin, UtcDateTime, utcnow
@@ -165,3 +181,100 @@ class QuantLlmCall(Base):
     created_at: Mapped[datetime] = mapped_column(
         UtcDateTime, default=utcnow, server_default=func.now(), index=True, nullable=False
     )
+
+
+# --- De datalaag (fase 2) ----------------------------------------------------
+
+# Prijzen met twaalf decimalen: een memecoin kost soms 0,000000123456 dollar, en afronden
+# op centen zou elke beweging wegpoetsen.
+PRICE = Numeric(30, 12)
+
+
+class QuantRawEvent(Base):
+    """De feed zoals hij binnenkwam. Append-only, nooit gewijzigd, nooit herschreven.
+
+    `payload_raw` is de tekst en niet een geparste structuur. Dat is het verschil tussen
+    "herhaalbaar" en "bit-voor-bit herhaalbaar": twee JSON-documenten met dezelfde
+    betekenis kunnen andere bytes zijn, en een feed die morgen zijn sleutelvolgorde
+    wijzigt, zou anders stil een ander corpus opleveren.
+
+    `chain_hash` hangt elke rij aan de vorige. Verandert er één byte in een oude rij, dan
+    sluit alles erna niet meer aan en zegt `verify_chain()` precies waar het misgaat.
+
+    Een dubbel event wordt wél opgeslagen (de tabel is append-only) en alleen gemarkeerd
+    met `duplicate_of_id`. Weggooien zou betekenen dat de ruwe opslag niet meer ruw is.
+    """
+
+    __tablename__ = "quant_raw_events"
+    __table_args__ = (
+        Index("ix_quant_raw_events_stream_hash", "source", "stream", "payload_hash"),
+        Index("ix_quant_raw_events_source_received", "source", "received_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Een eigen teller naast `id`, zodat de volgorde van de ketting expliciet is en niet
+    # afhangt van hoe de database zijn primaire sleutel uitdeelt.
+    seq: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    source: Mapped[str] = mapped_column(String(40), nullable=False)
+    stream: Mapped[str] = mapped_column(String(40), nullable=False)
+    payload_raw: Mapped[str] = mapped_column(Text, nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    chain_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True, nullable=False)
+    duplicate_of_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ingest_run_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+
+
+class QuantMarketTick(Base):
+    """De genormaliseerde vorm van een ruw event: dit is waar de Screener naar kijkt.
+
+    Volledig afgeleid en dus volledig weggooibaar. Dat is met opzet: de enige manier om te
+    bewijzen dat een replay hetzelfde resultaat geeft, is deze tabel weggooien, opnieuw
+    opbouwen uit de ruwe tabel en de afdruk vergelijken.
+    """
+
+    __tablename__ = "quant_market_ticks"
+    __table_args__ = (
+        Index("ix_quant_market_ticks_pool_observed", "pool_address", "observed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    raw_event_id: Mapped[int] = mapped_column(
+        ForeignKey("quant_raw_events.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    venue: Mapped[str] = mapped_column(String(40), nullable=False)
+    chain: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    pool_address: Mapped[str] = mapped_column(String(80), nullable=False)
+    token_address: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    observed_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    price_usd: Mapped[Decimal | None] = mapped_column(PRICE, nullable=True)
+    liquidity_usd: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
+    volume_usd: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
+    volume_window_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pool_created_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+
+class QuantIngestRun(Base):
+    """Wat de Scout wanneer heeft opgenomen.
+
+    Zonder deze rijen is "hoeveel data hebben we en van wanneer" een vraag die je niet kunt
+    beantwoorden, en "hoeveel groeit de schijf per dag" een schatting in plaats van een
+    meting. `stop_reason` staat erbij omdat een run die stilletjes ophoudt een gat in het
+    corpus achterlaat dat je nooit meer kunt vullen.
+    """
+
+    __tablename__ = "quant_ingest_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True, nullable=False)
+    stopped_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    stop_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    events: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ticks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duplicates: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    parse_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    bytes_stored: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)

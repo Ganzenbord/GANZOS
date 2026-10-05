@@ -110,3 +110,61 @@ class LlmCallOut(BaseModel):
     fx_rate: Decimal
     purpose: str
     created_at: UtcDatetime
+
+
+# --- De datalaag (fase 2) ----------------------------------------------------
+
+
+class DataCheckOut(BaseModel):
+    """Eén controle: wat hij vond, hoe erg dat is, en wat het betekent."""
+
+    check: str
+    count: int
+    severity: str
+    explanation: str
+    examples: list[str]
+
+
+class DataQualityOut(BaseModel):
+    verdict: str
+    explanation: str
+    ticks: int
+    raw_events: int
+    pools: int
+    synthetic_events: int
+    first_observed_at: UtcDatetime | None
+    last_observed_at: UtcDatetime | None
+    chain_ok: bool
+    chain_explanation: str
+    findings: list[DataCheckOut]
+    # Alle controles die er zijn, ook die niets vonden. Een scherm dat alleen de
+    # bevindingen laat zien, geeft de indruk dat er niet meer gecontroleerd wordt.
+    checks: list[DataCheckOut]
+
+
+class StorageOut(BaseModel):
+    events: int
+    ticks: int
+    bytes_stored: int
+    bytes_per_event: int
+    measured_seconds: float
+    first_received_at: UtcDatetime | None
+    last_received_at: UtcDatetime | None
+    projected_bytes_per_day: int
+    projected_bytes_per_month: int
+    explanation: str
+
+
+class IngestRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source: str
+    started_at: UtcDatetime
+    stopped_at: UtcDatetime | None
+    stop_reason: str | None
+    events: int
+    ticks: int
+    duplicates: int
+    parse_failures: int
+    bytes_stored: int
