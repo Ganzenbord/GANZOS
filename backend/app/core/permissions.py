@@ -62,6 +62,18 @@ PERMISSIONS: tuple[Permission, ...] = (
     Permission("upload.read", "Uploadschema bekijken", TIER_LIMITED),
     Permission("upload.schedule", "Uploads inplannen of wijzigen", TIER_TRUSTED),
     Permission("upload.execute", "Een upload nu uitvoeren", TIER_OWNER, True),
+    # Quant Lab. Let op de richting van de twee knoppen: stilzetten mag vanaf tier 2 en
+    # zonder tweede bevestiging, want stoppen is de veilige kant en een pincode intikken
+    # terwijl het misgaat kost seconden die je niet hebt. Weer aanzetten is wél gevoelig.
+    Permission("quant.read", "Het Quant Lab en de risicostand bekijken", TIER_TRUSTED),
+    Permission("quant.costs.read", "De modelkosten van het Quant Lab bekijken", TIER_OWNER),
+    Permission("quant.run.stop", "Het lab stilzetten met de noodstop", TIER_TRUSTED),
+    Permission(
+        "quant.run.start", "Het lab laten draaien en de noodstop eruit halen", TIER_OWNER, True
+    ),
+    Permission(
+        "quant.risk.reset", "De weekstop opnieuw zetten na een slechte week", TIER_OWNER, True
+    ),
 )
 
 PERMISSION_MAP: dict[str, Permission] = {perm.key: perm for perm in PERMISSIONS}

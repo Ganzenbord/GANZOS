@@ -143,6 +143,12 @@ def test_geen_enkel_responsemodel_heeft_een_veld_dat_naar_een_geheim_ruikt() -> 
         ("IdentifyResponse", "access_token"),
         # Zegt óf er gegevens zijn, niet welke.
         ("IntegrationOut", "has_credentials"),
+        # "tokens" in de betekenis van rekeneenheden van een taalmodel: een aantal, geen
+        # sleutel. Ze staan in het kostenboek omdat "waarom werd dit duurder" altijd een
+        # vraag is over hoeveel context erin ging.
+        ("LlmCallOut", "input_tokens"),
+        ("LlmCallOut", "output_tokens"),
+        ("LlmCallOut", "cache_read_tokens"),
     }
     verdacht = re.compile(
         r"(secret|password|credential|api_key|_hash|token|embedding$)", re.IGNORECASE

@@ -7,6 +7,7 @@ standaardsleutel zou betekenen dat versleutelde tokens door iedereen te lezen zi
 
 from __future__ import annotations
 
+from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
 
@@ -125,6 +126,19 @@ class Settings(BaseSettings):
     # Hoeveel seconden voor het verlopen van een token Ganz hem alvast vernieuwt. Zonder
     # marge verloopt hij precies tijdens een upload van tien minuten.
     youtube_token_margin_seconds: int = 120
+
+    # --- Quant Lab ----------------------------------------------------------
+    # Let op het verschil met de risicogrenzen: die staan als constanten in
+    # app/quantlab/risk_limits.py en zijn met opzet niet instelbaar. Wat hier staat zijn
+    # twee feiten over de buitenwereld, geen beleid.
+    #
+    # De papieren inleg. 1R is er 0,75% van, dus dit getal bepaalt hoe groot een positie
+    # in euro's is. De waarde hieronder is een voorlopige: zie de openstaande vraag over
+    # positiegrootte in docs/quant-lab/phase1-report.md.
+    quant_paper_equity_eur: Decimal = Decimal("1000")
+    # Koers dollar naar euro voor het kostenboek. Elke boeking bewaart de koers waarmee
+    # is gerekend, zodat het boek narekenbaar blijft als deze waarde niet meer klopt.
+    quant_usd_eur_rate: Decimal = Decimal("0.92")
 
     # Seed-data is uitsluitend voor development; zie scripts/seed.py.
     allow_seed_data: bool = False

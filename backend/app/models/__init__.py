@@ -27,6 +27,16 @@ from app.models.platform import (
     Skill,
     Workflow,
 )
+from app.models.quantlab import (
+    QuantControl,
+    QuantControlAction,
+    QuantControlSource,
+    QuantHeartbeat,
+    QuantLlmCall,
+    QuantRiskBooking,
+    QuantRiskControl,
+    QuantRiskEvent,
+)
 from app.models.social import (
     ChannelStatus,
     SocialChannel,
@@ -83,6 +93,14 @@ __all__ = [
     "MissionStatus",
     "MissionTask",
     "OPEN_UPLOAD_STATUSES",
+    "QuantControl",
+    "QuantControlAction",
+    "QuantControlSource",
+    "QuantHeartbeat",
+    "QuantLlmCall",
+    "QuantRiskBooking",
+    "QuantRiskControl",
+    "QuantRiskEvent",
     "Skill",
     "SocialChannel",
     "SocialChannelStats",
