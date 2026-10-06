@@ -47,10 +47,11 @@ from app.quantlab.risk import (
     RiskSnapshot,
     day_start,
     evaluate_entry,
-    one_r_eur,
+    one_r_amount,
     week_start,
 )
 from app.quantlab.safety import SafetyOracle, SafetyStatus
+from app.quantlab.stops import place_stop
 from app.quantlab.strategy import Candidate, Strategy
 
 logger = logging.getLogger("ganz.quantlab.engine")
@@ -133,6 +134,9 @@ class TradeRecord:
     token_address: str
     opened_at: datetime
     entry_reason: str
+    stop_basis: str
+    stop_distance_pct: Decimal
+    stop_clamped: str | None
     risk_r: Decimal
     risk_quote: Decimal
     units: Decimal
@@ -195,6 +199,25 @@ class _PriceIndex:
             tijden, prijzen = self._per_pool.setdefault(tick.pool_address, ([], []))
             tijden.append(tick.observed_at)
             prijzen.append(tick.price_usd)
+
+    def window(
+        self, pool_address: str, *, until: datetime, minutes: int
+    ) -> tuple[Decimal | None, Decimal | None]:
+        """De bodem en de top van de laatste `minutes` minuten vóór `until`.
+
+        Hieruit volgt de stopafstand van deze trade. Alleen ticks strikt vóór `until`, want
+        de tick waarop je instapt hoort niet in het venster waartegen je je stop zet."""
+        reeks = self._per_pool.get(pool_address)
+        if not reeks:
+            return None, None
+        tijden, prijzen = reeks
+        vanaf = until - timedelta(minutes=minutes)
+        eerste = bisect_left(tijden, vanaf)
+        laatste = bisect_left(tijden, until)
+        venster = prijzen[eerste:laatste]
+        if not venster:
+            return None, None
+        return min(venster), max(venster)
 
     def last_price(self, pool_address: str) -> Decimal | None:
         reeks = self._per_pool.get(pool_address)
@@ -274,7 +297,7 @@ def run_engine(
     prijzen = _PriceIndex(ticks)
     ledger = _RiskLedger(equity=equity_quote)
     regels = hypothesis.exit_rules
-    een_r = one_r_eur(equity_quote)
+    een_r = one_r_amount(equity_quote)
 
     posities: dict[str, OpenPosition] = {}
     trades: list[TradeRecord] = []
@@ -409,14 +432,31 @@ def run_engine(
             sla_over(voorstel, SkipReason.SELLABILITY_UNVERIFIED, uitslag.explanation)
             continue
 
-        # 4. De positie uitrekenen, en kijken of de pool hem kan dragen.
-        stop_afstand = (voorstel.price_usd * regels.stop_distance_pct).quantize(
-            Decimal("0.000000000001")
+        # 4. De stop voor déze trade, en daaruit de positie.
+        #
+        # De stop komt niet uit een vast percentage maar uit wat dit token zelf deed: onder
+        # de bodem van het venster waar de koers uit kwam. Een rustig token krijgt daarmee
+        # een krappe stop en een grote positie, een wild token het omgekeerde — en in beide
+        # gevallen staat er precies 1R op het spel.
+        bodem, top = prijzen.window(
+            voorstel.pool_address, until=moment, minutes=regels.stop.window_minutes
         )
+        try:
+            plaatsing = place_stop(
+                regels.stop,
+                entry_price=voorstel.price_usd,
+                window_low=bodem,
+                window_high=top,
+            )
+        except ValueError:
+            sla_over(voorstel, SkipReason.BAD_PRICE)
+            continue
+
+        stop_afstand = plaatsing.distance
         if stop_afstand <= 0:
             sla_over(voorstel, SkipReason.BAD_PRICE)
             continue
-        inleg = (een_r * hypothesis.sizing_risk_r / regels.stop_distance_pct).quantize(
+        inleg = (een_r * hypothesis.sizing_risk_r / plaatsing.distance_pct).quantize(
             MONEY, rounding=ROUND_DOWN
         )
         veelvoud = hypothesis.min_liquidity_multiple
@@ -476,7 +516,10 @@ def run_engine(
             pool_address=voorstel.pool_address,
             token_address=voorstel.token_address,
             opened_at=uitkomst.filled_at,
-            entry_reason=f"{strategy.name}: willekeurige instap uit het universum",
+            entry_reason=f"{strategy.name}",
+            stop_basis=plaatsing.basis,
+            stop_distance_pct=plaatsing.distance_pct,
+            stop_clamped=plaatsing.clamped,
             risk_r=hypothesis.sizing_risk_r,
             risk_quote=(uitkomst.units * stop_afstand).quantize(MONEY),
             units=uitkomst.units,
@@ -510,7 +553,10 @@ def run_engine(
                 price_usd=voorstel.price_usd,
                 taken=True,
                 reason="taken",
-                detail=f"Ingestapt voor ${inleg} met een stop op {stop}.",
+                detail=(
+                f"Ingestapt voor ${inleg} met een stop op {stop} "
+                f"({plaatsing.distance_pct * 100}%). {plaatsing.basis}"
+            ),
             )
         )
 

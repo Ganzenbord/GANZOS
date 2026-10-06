@@ -124,24 +124,20 @@ async def run_hypothesis(
     variant: str = "base",
     since: datetime | None = None,
     until: datetime | None = None,
-    equity_eur: Decimal | None = None,
-    usd_eur_rate: Decimal | None = None,
+    equity_usd: Decimal | None = None,
     attempts_per_hour_override: float | None = None,
     ticks: Sequence[Candidate] | None = None,
 ) -> EngineResult:
     """Draai één hypothese één keer en schrijf alles weg."""
     instellingen = get_settings()
-    equity_eur = equity_eur if equity_eur is not None else instellingen.quant_paper_equity_eur
-    koers = usd_eur_rate if usd_eur_rate is not None else instellingen.quant_usd_eur_rate
-    # De papieren equity staat in euro's; de venue rekent in dollars. `quant_usd_eur_rate`
-    # is de koers dollar naar euro (1 dollar is 0,92 euro), dus van euro naar dollar wordt
-    # er gedeeld en niet vermenigvuldigd.
-    #
-    # Dat stond eerst fout: een vermenigvuldiging maakte van 1000 euro 920 dollar in plaats
-    # van 1087. Op R had dat geen effect — 1R en de winst gaan door dezelfde koers, dus de
-    # fout valt weg — maar de positie in dollars was 15% te klein, en daarmee stond het
-    # filter "liquiditeit minstens 50x de positie" te ruim en viel de slippage te laag uit.
-    equity_quote = (equity_eur / koers).quantize(Decimal("0.01"))
+    # De papieren rekening staat in dollars, net als de venues. Er wordt in het hele
+    # handelspad niets omgerekend: elke omrekening is een plek waar een koers de verkeerde
+    # kant op kan gaan, en dat is één keer gebeurd. De koers hieronder gaat alleen mee in
+    # de run als context, want het kostenboek van de modellen rekent wél in euro's.
+    equity_quote = (
+        equity_usd if equity_usd is not None else instellingen.quant_paper_equity_usd
+    ).quantize(Decimal("0.01"))
+    koers = instellingen.quant_usd_eur_rate
 
     hypothese = await register_hypothesis(session, hypothesis)
     corpus = list(ticks) if ticks is not None else await load_ticks(
@@ -220,6 +216,9 @@ async def run_hypothesis(
             closed_at=trade.closed_at,
             entry_reason=trade.entry_reason[:60],
             exit_reason=trade.exit_reason,
+            stop_basis=trade.stop_basis,
+            stop_distance_pct=trade.stop_distance_pct,
+            stop_clamped=trade.stop_clamped,
             risk_r=trade.risk_r,
             risk_quote=trade.risk_quote,
             units=trade.units,

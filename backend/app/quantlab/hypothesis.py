@@ -25,6 +25,12 @@ import yaml
 
 from app.quantlab.exits import ExitRules
 from app.quantlab.fills import FillModel, StressProfile
+from app.quantlab.stops import (
+    DEFAULT_MAX_DISTANCE_PCT,
+    MIN_DISTANCE_DERIVATION,
+    StopKind,
+    StopRule,
+)
 
 
 class PreRegistrationError(RuntimeError):
@@ -137,7 +143,7 @@ def parse_hypothesis(source_yaml: str, *, path: str | None = None) -> Hypothesis
         safety_filters=dict(doc.get("safety_filters") or {}),
         entry=dict(doc.get("entry") or {}),
         exit_rules=ExitRules(
-            stop_distance_pct=Decimal(str(uit["stop_distance_pct"])),
+            stop=_stopregel(uit),
             take_half_at_r=Decimal(str(uit["take_half_at_r"])),
             trailing_stop_pct=Decimal(str(uit["trailing_stop_pct"])),
             max_hold_minutes=int(uit["max_hold_minutes"]),
@@ -149,6 +155,42 @@ def parse_hypothesis(source_yaml: str, *, path: str | None = None) -> Hypothesis
         success_criteria=str(doc.get("success_criteria") or "").strip(),
         source_yaml=source_yaml,
         path=path,
+    )
+
+
+def _stopregel(uit: dict[str, Any]) -> StopRule:
+    """De stopregel uit het `exit`-blok.
+
+    Twee vormen worden gelezen. `stop_distance_pct` is de oude, vaste vorm; die blijft
+    bestaan omdat een structurele stop alleen beter is als je kunt laten zien dát hij beter
+    is, en daarvoor moet je ertegen kunnen vergelijken. Het `stop`-blok is de nieuwe vorm,
+    waarin de stop per trade uit de marktstructuur volgt.
+    """
+    blok = uit.get("stop")
+    if blok is None:
+        if "stop_distance_pct" not in uit:
+            raise ValueError(
+                "Het `exit`-blok heeft een `stop`-blok nodig, of een `stop_distance_pct` "
+                "voor de oude vaste vorm."
+            )
+        return StopRule(
+            kind=StopKind.FIXED, distance_pct=Decimal(str(uit["stop_distance_pct"]))
+        )
+
+    soort = StopKind(str(blok.get("kind", StopKind.STRUCTURAL_RANGE)))
+    return StopRule(
+        kind=soort,
+        distance_pct=(
+            Decimal(str(blok["distance_pct"])) if blok.get("distance_pct") is not None else None
+        ),
+        window_minutes=int(blok.get("window_minutes", 10)),
+        margin_pct=Decimal(str(blok.get("margin_pct", "0.02"))),
+        min_distance_pct=Decimal(
+            str(blok.get("min_distance_pct", MIN_DISTANCE_DERIVATION["min_distance_pct"]))
+        ),
+        max_distance_pct=Decimal(
+            str(blok.get("max_distance_pct", DEFAULT_MAX_DISTANCE_PCT))
+        ),
     )
 
 

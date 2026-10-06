@@ -25,7 +25,7 @@ from app.quantlab.risk import (
     RiskVeto,
     VETO_UITLEG,
     evaluate_entry,
-    one_r_eur,
+    one_r_amount,
     position_units,
 )
 
@@ -52,37 +52,37 @@ INSTAP = EntryRequest(
 
 
 def test_1r_is_driekwart_procent_van_de_paper_equity() -> None:
-    assert one_r_eur(Decimal("10000")) == Decimal("75.00")
-    assert one_r_eur(Decimal("1000")) == Decimal("7.50")
+    assert one_r_amount(Decimal("10000")) == Decimal("75.00")
+    assert one_r_amount(Decimal("1000")) == Decimal("7.50")
 
 
 def test_1r_wordt_naar_beneden_afgerond() -> None:
     """Naar boven afronden zou betekenen dat 1R stiekem meer dan 0,75% is."""
-    assert one_r_eur(Decimal("1234.56")) == Decimal("9.25")
+    assert one_r_amount(Decimal("1234.56")) == Decimal("9.25")
 
 
 def test_zonder_equity_is_er_niets_te_riskeren() -> None:
-    assert one_r_eur(Decimal("0")) == Decimal("0")
-    assert one_r_eur(Decimal("-50")) == Decimal("0")
+    assert one_r_amount(Decimal("0")) == Decimal("0")
+    assert one_r_amount(Decimal("-50")) == Decimal("0")
 
 
 def test_de_omvang_hangt_uitsluitend_aan_de_equity() -> None:
     """Geen martingale, en dat is hier geen afspraak maar een signatuur.
 
-    `one_r_eur` kán niet naar de laatste uitslagen kijken, want die krijgt hij niet mee.
+    `one_r_amount` kán niet naar de laatste uitslagen kijken, want die krijgt hij niet mee.
     Komt er ooit een tweede parameter bij, dan valt deze test om en is dat een gesprek."""
-    parameters = list(inspect.signature(one_r_eur).parameters)
+    parameters = list(inspect.signature(one_r_amount).parameters)
     assert parameters == ["equity"], (
-        "one_r_eur mag alleen de equity zien. Een parameter erbij is de deur naar "
+        "one_r_amount mag alleen de equity zien. Een parameter erbij is de deur naar "
         f"positiegrootte op gevoel: {parameters}"
     )
 
 
 def test_een_reeks_verliezen_verandert_de_inzet_niet() -> None:
     """Vijf verliezen achter elkaar: bij dezelfde equity blijft 1R exact hetzelfde."""
-    eerste = one_r_eur(Decimal("10000"))
+    eerste = one_r_amount(Decimal("10000"))
     for _ in range(5):
-        assert one_r_eur(Decimal("10000")) == eerste
+        assert one_r_amount(Decimal("10000")) == eerste
 
 
 def test_de_positie_volgt_uit_de_afstand_tot_de_stop() -> None:

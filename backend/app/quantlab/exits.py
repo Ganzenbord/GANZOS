@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 
+from app.quantlab.stops import StopRule
+
 
 class ExitKind(StrEnum):
     STOP = "stop"
@@ -36,11 +38,12 @@ EXIT_UITLEG: dict[ExitKind, str] = {
 class ExitRules:
     """De exit-regels uit het hypothese-bestand.
 
-    `stop_distance_pct` is hoe ver de stop onder de instap ligt. Samen met 1R bepaalt dat de
-    positiegrootte: hoe dichter de stop, hoe groter de positie voor hetzelfde risico.
+    `stop` bepaalt hoe ver de stop onder de instap komt, en daarmee de positiegrootte: hoe
+    dichter de stop, hoe groter de positie voor hetzelfde risico. Dat is per trade anders
+    bij een structurele stop — zie `app/quantlab/stops.py`.
     """
 
-    stop_distance_pct: Decimal
+    stop: StopRule
     take_half_at_r: Decimal
     trailing_stop_pct: Decimal
     max_hold_minutes: int

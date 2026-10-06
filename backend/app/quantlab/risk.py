@@ -152,8 +152,13 @@ class RiskDecision:
     position_units: Decimal
 
 
-def one_r_eur(equity: Decimal) -> Decimal:
-    """Hoeveel euro één R is.
+def one_r_amount(equity: Decimal) -> Decimal:
+    """Hoeveel geld één R is, in de valuta van de equity.
+
+    Valuta-agnostisch met opzet: de functie rekent een percentage en weet niet of er
+    dollars of euro's in gaan. De papieren rekening staat in dollars (de venues rekenen
+    in dollars); het maandbudget voor de modellen staat in euro's. Door hier geen valuta
+    aan te nemen, kan er ook niets stilletjes worden omgerekend.
 
     Deze functie ziet uitsluitend de equity, en dat is de hele bescherming tegen
     martingale: er is geen parameter waarin "ik heb net drie keer verloren" kan passen.
@@ -203,7 +208,7 @@ def evaluate_entry(snapshot: RiskSnapshot, request: EntryRequest) -> RiskDecisio
     if snapshot.open_risk_r + request.risk_r > MAX_OPEN_RISK_R:
         return _nee(RiskVeto.OPEN_RISK_EXCEEDED)
 
-    risico = (one_r_eur(snapshot.equity) * request.risk_r).quantize(
+    risico = (one_r_amount(snapshot.equity) * request.risk_r).quantize(
         CENTEN, rounding=ROUND_DOWN
     )
     try:

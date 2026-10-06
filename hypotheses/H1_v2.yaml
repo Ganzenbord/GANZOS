@@ -1,0 +1,113 @@
+# H1_v1 — de memecoin-sniper. Paper-only, goedgekeurd door Stef.
+#
+# Vastgelegd en gehasht vóór de eerste run (sectie 8 van de opdracht). Wijzigen betekent
+# H1_v2 en de trade-teller begint opnieuw. Dat is het hele punt: het voorkomt dat er
+# achteraf aan de entry-trigger wordt gedraaid tot de curve bevalt.
+#
+# De entry-trigger draait nog niet. Fase 3 bouwt de paper broker en de controlegroep H0;
+# de Screener die deze trigger uitvoert komt in fase 4. Dit bestand staat er nu al omdat
+# pre-registratie betekent: vastleggen vóór de run, niet eraan beginnen.
+#
+# De waarden zijn ongetuned startwaarden van Stef en mij. Het zijn geen bewezen regels en
+# ze worden niet geoptimaliseerd.
+
+name: H1
+version: v2
+statement: >
+  Nieuwe tokens die aan de veiligheidsfilters voldoen en de entry-trigger geven (uitbraak
+  boven de hoogste prijs van de eerste tien minuten, met volume van minimaal drie keer de
+  mediaan), hebben een positieve expectancy na kosten.
+paper_only: true
+
+universe:
+  chain: solana
+  venue_any: true
+  min_liquidity_usd: 1000
+
+safety_filters:
+  require_lp_burned_or_locked_days: 30
+  require_mint_authority_revoked: true
+  require_freeze_authority_revoked: true
+  # Exclusief LP- en burn-adressen. Dit is het moeilijkste filter om goed te krijgen: welk
+  # adres de LP is, verschilt per venue en per lock-programma. Zie het fase 0-rapport.
+  max_top10_holder_share: 0.20
+  min_liquidity_multiple_of_position: 50
+  exclude_when_sellability_unverified: true
+
+entry:
+  kind: breakout
+  min_token_age_minutes: 5
+  max_token_age_minutes: 30
+  # Uitbraak boven de hoogste prijs van de eerste tien minuten.
+  breakout_window_minutes: 10
+  # Volume van de laatste vijf minuten minstens drie keer de mediaan van die eerste tien.
+  volume_window_minutes: 5
+  volume_multiple_of_median: 3.0
+
+exit:
+  # De stop komt niet uit een vast percentage maar per trade uit wat dit token zelf deed.
+  # De gedachte in één zin: de trade is weerlegd als de koers terugvalt door het bereik
+  # waar hij uit kwam.
+  #
+  # Een rustig token krijgt daarmee een krappe stop en een grote positie, een wild token
+  # het omgekeerde — en in beide gevallen staat er precies 1R op het spel. Wat de
+  # stopafstand niet verandert, is de grootte van een verlies: die is per constructie 1R.
+  # Wat hij verandert, is hoe vaak je wordt uitgestopt en hoe ver de koers moet lopen
+  # voordat de helft eruit kan (+2R is twee keer de stopafstand).
+  stop:
+    kind: structural_range
+    window_minutes: 10
+    # Iets onder de bodem, zodat één tick ruis de stop niet meteen raakt.
+    margin_pct: 0.02
+    # AFGELEID, niet gekozen. Bij een pool die precies aan het filter "liquiditeit minstens
+    # 50x de positie" voldoet, is de quote-kant 25x de positie en is de price impact van
+    # een constant-product pool ongeveer 1/25 = 4%. De positie is 1R/stopafstand, dus de
+    # slippage kost 0,04/stopafstand van je 1R. Bij 20% is dat 20% van 1R; bij 10% zou het
+    # 40% zijn — aan slippage alleen, voordat de trade iets heeft gedaan.
+    # De som staat in app/quantlab/stops.py (MIN_DISTANCE_DERIVATION) met een test erop.
+    min_distance_pct: 0.20
+    # NIET afgeleid. Dit houdt tegen dat de helft pas bij een verdubbeling eruit gaat; wat
+    # hier redelijk is, hangt af van hoe hard een token van minuten oud werkelijk beweegt,
+    # en dat is niet gemeten. De enige overgebleven gok in de stopregel.
+    max_distance_pct: 0.50
+  take_half_at_r: 2.0
+  trailing_stop_pct: 0.20
+  max_hold_minutes: 240
+
+sizing:
+  risk_per_trade_r: 1.0
+
+# Identiek aan H0_v1: een verschil in kosten zou het hele vergelijk waardeloos maken.
+cost_model:
+  swap_fee_bps: 30
+  priority_fee_usd: 0.05
+  network_fee_usd: 0.001
+  failure_probability: 0.05
+  latency_p50_ms: 800
+  latency_p95_ms: 3000
+  exit_haircut_bps: 150
+  exit_haircut_above_pool_share: 0.01
+
+cost_model_provenance:
+  swap_fee_bps: "niet geverifieerd — gangbare AMM-fee; na te meten in de pooldocumentatie van de venue"
+  priority_fee_usd: "niet geverifieerd — hangt af van de drukte op de chain; na te meten uit echte transacties"
+  network_fee_usd: "niet geverifieerd — basis-transactiekosten; na te lezen in de chaindocumentatie"
+  failure_probability: "niet geverifieerd — na te meten uit het aandeel mislukte transacties in echte data"
+  latency_p50_ms: "niet geverifieerd — na te meten tussen signaal en bevestigde transactie"
+  latency_p95_ms: "niet geverifieerd — idem, staartwaarde"
+  exit_haircut_bps: "niet geverifieerd — bewust conservatief; in paniek krijg je slechter dan de AMM-curve"
+  exit_haircut_above_pool_share: "niet geverifieerd — drempel waarboven de haircut geldt"
+
+# Vooraf en niet onderhandelbaar (sectie 8).
+kill_criteria:
+  min_trades_for_conclusion: 150
+  max_drawdown_r: 30
+  # Na 150 gesloten trades moet de ondergrens van het 90%-betrouwbaarheidsinterval van de
+  # expectancy boven nul liggen. Anders stopt H1.
+  expectancy_ci_lower_bound_must_exceed: 0.0
+  must_beat_control: H0
+
+success_criteria: >
+  Na minstens 150 gesloten trades is de ondergrens van het 90%-betrouwbaarheidsinterval van
+  de expectancy (in R, na kosten) groter dan nul, H1 verslaat H0 aantoonbaar, de drawdown
+  bleef onder 30R, en het resultaat overleeft de stresstest met 2x slippage en 2x latency.

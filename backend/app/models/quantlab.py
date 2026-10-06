@@ -402,6 +402,16 @@ class QuantPaperTrade(Base):
     entry_reason: Mapped[str] = mapped_column(String(60), nullable=False)
     exit_reason: Mapped[str | None] = mapped_column(String(60), nullable=True)
 
+    # Waar de stop van deze trade vandaan kwam. Dat staat per trade in de tabel en niet
+    # alleen in de hypothese, omdat de stop per trade anders is: hij volgt uit wat dit
+    # token zelf deed. Zonder deze drie kolommen kun je achteraf niet nagaan waarom een
+    # positie zo groot was.
+    stop_basis: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    stop_distance_pct: Mapped[Decimal] = mapped_column(
+        Numeric(8, 4), nullable=False, default=0
+    )
+    stop_clamped: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
     risk_r: Mapped[Decimal] = mapped_column(R_MULTIPLE, nullable=False)
     risk_quote: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
     units: Mapped[Decimal] = mapped_column(Numeric(30, 8), nullable=False)

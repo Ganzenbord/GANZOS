@@ -27,7 +27,7 @@ from app.quantlab.agents import AGENT_UITLEG
 from app.quantlab.budget import MODE_UITLEG
 from app.quantlab.budget_limits import RESERVE_EUR
 from app.quantlab.dataquality import CHECK_UITLEG, DataCheck, QualityVerdict
-from app.quantlab.risk import VETO_UITLEG, RiskSnapshot, RiskVeto, one_r_eur
+from app.quantlab.risk import VETO_UITLEG, RiskSnapshot, RiskVeto, one_r_amount
 from app.schemas.quant import (
     AgentSpendOut,
     ExpectancyOut,
@@ -97,8 +97,8 @@ def _status_out(snapshot: RiskSnapshot) -> RiskStatusOut:
     return RiskStatusOut(
         trading_mode="paper",
         limits=_limits_out(),
-        equity_eur=snapshot.equity,
-        one_r_eur=one_r_eur(snapshot.equity),
+        equity_usd=snapshot.equity,
+        one_r_usd=one_r_amount(snapshot.equity),
         open_risk_r=snapshot.open_risk_r,
         realized_day_r=snapshot.realized_day_r,
         realized_week_r=snapshot.realized_week_r,
@@ -120,7 +120,7 @@ def _status_out(snapshot: RiskSnapshot) -> RiskStatusOut:
 
 async def _snapshot(session: AsyncSession, settings: Settings) -> RiskSnapshot:
     return await quant_risk_service.snapshot(
-        session, equity=settings.quant_paper_equity_eur
+        session, equity=settings.quant_paper_equity_usd
     )
 
 

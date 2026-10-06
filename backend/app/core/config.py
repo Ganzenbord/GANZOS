@@ -132,12 +132,15 @@ class Settings(BaseSettings):
     # app/quantlab/risk_limits.py en zijn met opzet niet instelbaar. Wat hier staat zijn
     # twee feiten over de buitenwereld, geen beleid.
     #
-    # De papieren inleg. 1R is er 0,75% van, dus dit getal bepaalt hoe groot een positie
-    # in euro's is. De waarde hieronder is een voorlopige: zie de openstaande vraag over
-    # positiegrootte in docs/quant-lab/phase1-report.md.
-    quant_paper_equity_eur: Decimal = Decimal("1000")
-    # Koers dollar naar euro voor het kostenboek. Elke boeking bewaart de koers waarmee
-    # is gerekend, zodat het boek narekenbaar blijft als deze waarde niet meer klopt.
+    # De papieren inleg, in dollars. 1R is er 0,75% van, dus bij 1000 dollar is 1R 7,50
+    # dollar. Met opzet in dollars en niet in euro's: de venues rekenen in dollars, dus
+    # elke omrekening in het handelspad is een plek waar een koers de verkeerde kant op kan
+    # gaan — en dat is één keer gebeurd (zie docs/quant-lab/phase3-report.md).
+    quant_paper_equity_usd: Decimal = Decimal("1000")
+    # Koers dollar naar euro, uitsluitend voor het kostenboek: het maandbudget staat in
+    # euro's (sectie 12) en de modelprijzen in dollars. De papieren handel gebruikt deze
+    # koers niet. Elke boeking bewaart de koers waarmee is gerekend, zodat het boek
+    # narekenbaar blijft als deze waarde niet meer klopt.
     quant_usd_eur_rate: Decimal = Decimal("0.92")
 
     # Seed-data is uitsluitend voor development; zie scripts/seed.py.

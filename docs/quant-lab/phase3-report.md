@@ -469,3 +469,130 @@ Eén ding om mee te nemen: de drie fouten in §3.1 zijn gevonden doordat een get
 was. +8R met een winrate van 100% op willekeurige instappen is niet geloofwaardig, en dat was
 de aanleiding om te gaan zoeken. Als er in een later rapport een cijfer staat dat te mooi
 lijkt, is dat precies de reactie die ik ervan verwacht.
+
+---
+
+# Naschrift: dollars, en de stop per trade
+
+Na jouw antwoord op "is 25% aanbevolen?" zijn er drie dingen gewijzigd. **504 tests groen,
+17 nieuw.**
+
+## 1. Alles in dollars
+
+De papieren rekening staat nu in dollars (`GANZ_QUANT_PAPER_EQUITY_USD`, standaard $1000,
+dus 1R = $7,50). In het hele handelspad wordt niets meer omgerekend.
+
+Dat is geen cosmetische wijziging: de omrekening die er zat, ging de verkeerde kant op (zie
+§3.2 hierboven). De oplossing is niet een betere omrekening maar géén omrekening — elke
+omrekening in het handelspad is een plek waar een koers kan omkeren zonder dat het opvalt.
+`one_r_eur()` heet nu `one_r_amount()`, want de functie rekent een percentage en hoort niet
+te weten in welke valuta.
+
+Het maandbudget voor de modellen blijft in euro's (€200, sectie 12), en daar blijft
+`quant_usd_eur_rate` voor bestaan. De twee zijn nu strikt gescheiden: de handel in dollars,
+het modelbudget in euro's, en geen koers die tussen die twee door het handelspad loopt.
+
+## 2. De stop volgt per trade uit de structuur
+
+`app/quantlab/stops.py`. Niet langer één percentage voor elk token, maar: **de stop komt
+onder de bodem van het venster waar de koers uit kwam.** In één zin — de trade is weerlegd
+als de koers terugvalt door het bereik waar hij uit kwam.
+
+Een rustig token krijgt daarmee een krappe stop en een grote positie, een wild token het
+omgekeerde, en in beide gevallen staat er precies 1R op het spel.
+
+**Deterministische code, geen taalmodel.** Dat is geen keuze van mij maar sectie 6 van je
+eigen opdracht: geen LLM-aanroep in het pad waarin een trade tot stand komt. De "agent" die
+dit per trade bepaalt, is de Screener — en die is code.
+
+Twee grenzen eromheen, en het verschil tussen die twee is belangrijk:
+
+**De ondergrens van 20% is afgeleid, niet gekozen.** Bij een pool die precies aan het filter
+"liquiditeit ≥ 50× de positie" voldoet, is de quote-kant 25× de positie, dus de price impact
+van een constant-product pool is ongeveer 1/25 = 4%. De positie is 1R/stopafstand, dus de
+slippage kost **0,04/stopafstand** van je 1R. Wil je daar hoogstens 20% van 1R aan
+kwijtraken, dan moet de stop minstens 20% zijn. Bij 10% zou je 40% van je risicobudget aan
+slippage verliezen voordat de trade iets heeft gedaan.
+
+Die som staat in de code (`MIN_DISTANCE_DERIVATION`) met een test die hem naloopt, niet
+alleen in dit rapport.
+
+**De bovengrens van 50% is wél een gok.** Hij houdt tegen dat de helft pas bij een
+verdubbeling eruit gaat (+2R is twee keer de stopafstand). Wat hier redelijk is, hangt af
+van hoe hard een token van minuten oud werkelijk beweegt — en dat is niet gemeten.
+
+Elke trade legt nu vast waar zijn stop vandaan kwam (`stop_basis`, `stop_distance_pct`,
+`stop_clamped`). Zonder dat kun je bij een verlies niet nagaan waarom de positie zo groot
+was.
+
+`H0_v2.yaml` en `H1_v2.yaml` gebruiken deze vorm. `H0_v1` en `H1_v1` blijven bestaan en
+blijven laadbaar, want **een structurele stop is alleen beter als je kunt laten zien dát hij
+beter is** — en daarvoor moet je ertegen kunnen vergelijken.
+
+## 3. En dat vergelijk valt niet uit zoals bedoeld
+
+`backend/scripts/quant_stop_compare.py`, twee dagen synthetische data, hetzelfde zaad, dus
+exact dezelfde instappen:
+
+```
+  hypothese  | stop                   | signalen | trades |         R |  drawdown |     slip $
+  H0_v1      | vast 25%               |     1405 |    234 |   13.0655 |   24.2574 |  77.701355
+  H0_v2      | per trade (structuur)  |     1405 |    254 |    9.3602 |   30.0660 | 113.223909
+
+  H0_v1: stopafstand 0.2500-0.2500 (gemiddeld 0.2500) — tegen een grens aangelopen: 0 van 234
+  H0_v2: stopafstand 0.2000-0.2989 (gemiddeld 0.2031) — tegen een grens aangelopen: 236 van 254
+```
+
+**236 van de 254 trades liepen tegen de ondergrens aan.** De structuur komt dus bijna nooit
+aan het woord: de 10-minutenbodem lag meestal 3 tot 15% onder de instap, en dat is krapper
+dan de afgeleide ondergrens van 20%. Op deze data is de "structurele" stop in de praktijk
+een vaste stop van 20%.
+
+Twee eerlijke lezingen, en ik weet niet welke het is:
+
+1. **Mijn synthetische data beweegt te weinig.** Een echte memecoin van tien minuten oud
+   doet meer dan 3% in tien minuten. Dan zou de bodem vaak onder de 20% liggen en krijgt de
+   regel wel ruimte. In dat geval is dit resultaat een eigenschap van mijn random walk, niet
+   van de regel.
+2. **Het liquiditeitsfilter is de echte beperking.** Zolang "liquiditeit ≥ 50× de positie"
+   geldt, kan een stop economisch niet krapper dan 20% — en dan maakt de structuur minder
+   uit dan de pooldiepte. Dat zou betekenen dat de interessante knop het filter is en niet
+   de stop.
+
+Welke van de twee het is, is te beantwoorden met één uur echte data en niet met nog een
+run op verzonnen data.
+
+Verder uit dit vergelijk, en dit is gewoon de rekenkunde die je hebt goedgekeurd: de
+gemiddelde positie ging van $30,00 naar $37,06 (krappere stop = grotere positie), en de
+slippage ging daarmee van $77,70 naar $113,22. Slippage loopt op de liquiditeitsgrens
+recht mee met de positie, dus dat hoort zo.
+
+## 4. Nog twee dingen die ik onderweg vond
+
+**Ik las bijna een verkeerd getal voor.** In het proefscript liepen twee kolommen aan elkaar
+vast (`30.066113.223909`), en ik las de slippage eerst als $13,22 in plaats van $113,22 — een
+factor 8,5 de verkeerde kant op, en in de richting die het resultaat mooier maakte. Ik heb
+het nagerekend tegen de database voordat ik het opschreef, en toen bleek het de opmaak. De
+kolommen hebben nu een scheidingsteken. Dat is geen grote fout, maar het is wel precies de
+route waarlangs een verzonnen cijfer in een rapport belandt.
+
+**Het liquiditeitsfilter en de uitstap-haircut zijn niet op elkaar afgestemd.** Het filter
+zegt "liquiditeit ≥ 50× de positie", dus de positie is 2% van de pool. De haircut gaat aan
+boven 1% van de pool. Die twee samen betekenen dat de haircut bij élke trade op de
+liquiditeitsgrens afgaat. Ik heb dat **niet** gewijzigd, en dat is een keuze: de haircut
+vaker laten afgaan is de conservatieve kant, en conservatief is bij een paper broker de
+juiste kant om fout te zitten. Maar het is geen bewuste afstemming, en als je wil dat
+posities onder 1% van de pool blijven, moet het filter naar 100×. Zeg het als je dat wil.
+
+## 5. Wat dit betekent voor de open vragen
+
+Vraag 1 uit §5 hierboven ("klopt de stopafstand van 25%?") is hiermee vervallen: er is geen
+vast percentage meer. Wat ervoor in de plaats komt:
+
+1. **De bovengrens van 50% is nu de enige gok in de stopregel.** Hij bepaalt wanneer een
+   token te wild is om te handelen. Heb je een gevoel voor waar die grens hoort te liggen?
+2. **Wil je het liquiditeitsfilter op 50× houden of naar 100×?** Zie §4. Op 50× gaat de
+   haircut altijd af; op 100× blijft de positie onder de haircut-drempel maar vallen er meer
+   pools af.
+3. Het netwerk, en de twee vragen uit fase 1 (JEV-prijs, en of de €200 exclusief bouwkosten
+   is) staan nog open.

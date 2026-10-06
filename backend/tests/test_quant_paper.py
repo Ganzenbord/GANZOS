@@ -36,6 +36,7 @@ from app.quantlab.safety import (
     SafetyStatus,
     SyntheticSafetyOracle,
 )
+from app.quantlab.stops import StopKind, StopRule
 from app.quantlab.strategy import Candidate, RandomEntryStrategy
 from app.quantlab.synthetic import SyntheticPoolSource
 
@@ -51,14 +52,20 @@ def bron(**kwargs) -> SyntheticPoolSource:
 
 
 def h0() -> HypothesisFile:
+    """De oude vorm met een vaste stop van 25%. Blijft bestaan om tegen te vergelijken."""
     return load_hypothesis(HYPOTHESES / "H0_v1.yaml")
+
+
+def h0_v2() -> HypothesisFile:
+    """De nieuwe vorm: de stop volgt per trade uit wat het token zelf deed."""
+    return load_hypothesis(HYPOTHESES / "H0_v2.yaml")
 
 
 # --- Pre-registratie ----------------------------------------------------------
 
 
 def test_de_hypothesebestanden_laden() -> None:
-    for naam in ("H0_v1", "H1_v1"):
+    for naam in ("H0_v1", "H1_v1", "H0_v2", "H1_v2"):
         hypothese = load_hypothesis(HYPOTHESES / f"{naam}.yaml")
         assert hypothese.name and hypothese.version
         assert hypothese.statement.strip()
@@ -80,18 +87,23 @@ def test_elke_kostenparameter_heeft_een_herkomst() -> None:
     Geen enkele waarde in het kostenmodel is op dit moment geverifieerd — er is geen bron
     bereikbaar. Dan is het minste wat je kunt doen: per parameter opschrijven waar hij
     vandaan komt en wat er nodig is om hem na te meten."""
-    for naam in ("H0_v1", "H1_v1"):
+    for naam in ("H0_v1", "H1_v1", "H0_v2", "H1_v2"):
         hypothese = load_hypothesis(HYPOTHESES / f"{naam}.yaml")
         assert set(hypothese.cost_model_provenance) == set(hypothese.cost_model), naam
         for sleutel, herkomst in hypothese.cost_model_provenance.items():
             assert len(herkomst) > 20, f"{naam}.{sleutel} heeft geen bruikbare herkomst"
 
 
-def test_h0_en_h1_hebben_hetzelfde_kostenmodel_en_dezelfde_exits() -> None:
+@pytest.mark.parametrize("versie", ["v1", "v2"])
+def test_h0_en_h1_hebben_hetzelfde_kostenmodel_en_dezelfde_exits(versie: str) -> None:
     """H0 is de ruisvloer waar H1 tegen wordt afgemeten. Een verschil in kosten of exits zou
-    dat vergelijk waardeloos maken: dan meet je twee verschillende dingen."""
-    nul = load_hypothesis(HYPOTHESES / "H0_v1.yaml")
-    een = load_hypothesis(HYPOTHESES / "H1_v1.yaml")
+    dat vergelijk waardeloos maken: dan meet je twee verschillende dingen.
+
+    Dat geldt ook voor de stopregel: zouden H0 en H1 hun stop anders bepalen, dan verschilt
+    de positiegrootte systematisch en vergelijk je twee sizings in plaats van twee
+    strategieën."""
+    nul = load_hypothesis(HYPOTHESES / f"H0_{versie}.yaml")
+    een = load_hypothesis(HYPOTHESES / f"H1_{versie}.yaml")
     assert nul.cost_model == een.cost_model
     assert nul.exit_rules == een.exit_rules
     assert nul.sizing_risk_r == een.sizing_risk_r
@@ -159,7 +171,7 @@ async def test_een_nieuwe_versie_mag_wel(session) -> None:
 
 
 REGELS = ExitRules(
-    stop_distance_pct=Decimal("0.25"),
+    stop=StopRule(kind=StopKind.FIXED, distance_pct=Decimal("0.25")),
     take_half_at_r=Decimal("2"),
     trailing_stop_pct=Decimal("0.20"),
     max_hold_minutes=240,
@@ -577,15 +589,18 @@ async def test_geen_enkele_trade_verliest_veel_meer_dan_1r(session) -> None:
     assert slechtste > Decimal("-1.5"), f"slechtste trade was {slechtste}R"
 
 
-async def test_euros_worden_de_juiste_kant_op_omgerekend(session) -> None:
-    """`quant_usd_eur_rate` is de koers dollar naar euro, dus euro naar dollar is delen.
+async def test_er_wordt_in_het_handelspad_niets_omgerekend(session) -> None:
+    """De papieren rekening staat in dollars, net als de venues.
 
-    Dit stond fout: vermenigvuldigen maakte van 1000 euro 920 dollar in plaats van 1087.
-    Op R was dat niet te zien, want 1R en de winst gaan door dezelfde koers en de fout valt
-    weg. Wat er wel misging: de positie in dollars was 15% te klein, dus het filter
-    "liquiditeit minstens 50x de positie" stond te ruim en de slippage viel te laag uit.
-    Precies het soort fout dat zich verstopt achter een getal dat klopt.
-    """
+    Hier zat eerst een omrekening van euro's naar dollars, en die ging de verkeerde kant
+    op: vermenigvuldigen met 0,92 in plaats van delen, dus 1000 euro werd 920 dollar in
+    plaats van 1087. Op R was dat niet te zien, want 1R en de winst gingen door dezelfde
+    koers en de fout viel weg. Wat er wel misging: de positie was 15% te klein, dus het
+    filter "liquiditeit minstens 50x de positie" stond te ruim en de slippage viel te laag
+    uit — precies het soort fout dat zich verstopt achter een getal dat klopt.
+
+    De oplossing is niet een betere omrekening maar géén omrekening. Deze test pint dat
+    vast: wat erin gaat, komt er onveranderd uit."""
     from app.models.quantlab import QuantStrategyRun
     from app.services import quant_paper_service
     from sqlalchemy import select
@@ -596,16 +611,93 @@ async def test_euros_worden_de_juiste_kant_op_omgerekend(session) -> None:
         hypothesis=h0(),
         seed=1,
         safety=AlwaysSafeOracle(),
-        equity_eur=Decimal("1000"),
-        usd_eur_rate=Decimal("0.92"),
+        equity_usd=Decimal("1000"),
     )
     await session.commit()
 
     run = (await session.execute(select(QuantStrategyRun))).scalar_one()
-    # 1000 euro bij 1 dollar = 0,92 euro is 1086,96 dollar.
-    assert run.equity_quote == Decimal("1086.96")
-    # En 1R is daar 0,75% van: 8,15 dollar.
-    assert run.one_r_quote == Decimal("8.15")
+    assert run.equity_quote == Decimal("1000.00")
+    # 1R is 0,75% van de equity: 7,50 dollar.
+    assert run.one_r_quote == Decimal("7.50")
+
+
+async def test_de_stop_is_per_trade_anders(session) -> None:
+    """Het punt van de hele wijziging: niet één percentage voor alles.
+
+    Elke trade legt vast waar zijn stop vandaan kwam, want zonder dat kun je achteraf niet
+    nagaan waarom een positie zo groot was."""
+    from app.models.quantlab import QuantPaperTrade
+    from app.services import quant_paper_service
+    from sqlalchemy import select
+
+    await _corpus(
+        session, duration=timedelta(hours=4), pools=6,
+        new_pool_every_minutes=5, pool_lifetime_minutes=60,
+    )
+    await quant_paper_service.run_hypothesis(
+        session, hypothesis=h0_v2(), seed=11, safety=AlwaysSafeOracle(),
+        attempts_per_hour_override=120,
+    )
+    await session.commit()
+
+    trades = (await session.execute(select(QuantPaperTrade))).scalars().all()
+    assert len(trades) > 5
+    afstanden = {t.stop_distance_pct for t in trades}
+    assert len(afstanden) > 1, f"elke trade kreeg dezelfde stop: {afstanden}"
+    for trade in trades:
+        assert trade.stop_basis, "geen uitleg waar de stop vandaan kwam"
+        assert Decimal("0.20") <= trade.stop_distance_pct <= Decimal("0.50")
+
+
+async def test_de_stopgrenzen_worden_niet_overschreden(session) -> None:
+    """De ondergrens van 20% is afgeleid uit het kostenmodel; eronder eet de slippage je
+    1R op. De bovengrens houdt tegen dat de helft pas bij een verdubbeling eruit gaat."""
+    from app.models.quantlab import QuantPaperTrade
+    from app.services import quant_paper_service
+    from sqlalchemy import select
+
+    await _corpus(
+        session, duration=timedelta(hours=3), pools=8,
+        new_pool_every_minutes=5, pool_lifetime_minutes=60,
+    )
+    await quant_paper_service.run_hypothesis(
+        session, hypothesis=h0_v2(), seed=3, safety=AlwaysSafeOracle(),
+        attempts_per_hour_override=200,
+    )
+    await session.commit()
+
+    trades = (await session.execute(select(QuantPaperTrade))).scalars().all()
+    assert trades
+    for trade in trades:
+        assert trade.stop_distance_pct >= Decimal("0.20")
+        assert trade.stop_distance_pct <= Decimal("0.50")
+        assert trade.stop_price < trade.entry_fill_price
+
+
+async def test_een_vaste_en_een_structurele_stop_zijn_te_vergelijken(session) -> None:
+    """Een structurele stop is alleen beter als je kunt laten zien dát hij beter is.
+
+    Daarom blijft de vaste vorm bestaan en draaien ze over hetzelfde corpus met hetzelfde
+    zaad: dan proberen ze dezelfde instappen en is het enige verschil de stop."""
+    from app.services import quant_paper_service
+
+    await _corpus(
+        session, duration=timedelta(hours=4), pools=6,
+        new_pool_every_minutes=5, pool_lifetime_minutes=60,
+    )
+    vast = await quant_paper_service.run_hypothesis(
+        session, hypothesis=h0(), seed=11, safety=AlwaysSafeOracle(),
+        attempts_per_hour_override=120,
+    )
+    await session.commit()
+    structureel = await quant_paper_service.run_hypothesis(
+        session, hypothesis=h0_v2(), seed=11, safety=AlwaysSafeOracle(),
+        attempts_per_hour_override=120,
+    )
+    await session.commit()
+
+    assert vast.signals_proposed == structureel.signals_proposed
+    assert vast.trades_opened > 0 and structureel.trades_opened > 0
 
 
 # --- De stresstest ------------------------------------------------------------

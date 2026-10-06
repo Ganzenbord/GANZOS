@@ -114,10 +114,10 @@ async def draaien(session) -> dict:
     )
     for naam, uitslag in uitslagen.items():
         print(
-            f"  {naam:<12}{uitslag.signals_proposed:>9}{uitslag.trades_opened:>8}"
-            f"{uitslag.trades_closed:>9}{uitslag.trades_force_closed:>10}"
-            f"{str(uitslag.realized_r):>9}{str(uitslag.max_drawdown_r):>10}"
-            f"{str(uitslag.total_fees_usd):>9}{str(uitslag.total_slippage_usd):>9}"
+            f"  {naam:<12} | {uitslag.signals_proposed:>8} | {uitslag.trades_opened:>6}"
+            f" | {uitslag.trades_closed:>8} | {uitslag.trades_force_closed:>8}"
+            f" | {str(uitslag.realized_r):>9} | {str(uitslag.max_drawdown_r):>9}"
+            f" | {str(uitslag.total_fees_usd):>9} | {str(uitslag.total_slippage_usd):>10}"
         )
     print(
         "\n  De signalen zijn in alle vier de varianten gelijk: het enige verschil is het\n"
@@ -266,11 +266,11 @@ async def latency_resolutie(session) -> None:
         attempts_per_hour_override=60,
     )
     await session.commit()
-    print(f"  {'variant':<12}{'trades':>8}{'R':>10}{'slip $':>10}")
+    print(f"  {'variant':<12} | {'trades':>6} | {'R':>9} | {'slip $':>10}")
     for naam, uitslag in uitslagen.items():
         print(
-            f"  {naam:<12}{uitslag.trades_opened:>8}{str(uitslag.realized_r):>10}"
-            f"{str(uitslag.total_slippage_usd):>10}"
+            f"  {naam:<12} | {uitslag.trades_opened:>6} | {str(uitslag.realized_r):>9}"
+            f" | {str(uitslag.total_slippage_usd):>10}"
         )
     basis, traag = uitslagen["base"], uitslagen["latency_2x"]
     zelfde = basis.realized_r == traag.realized_r

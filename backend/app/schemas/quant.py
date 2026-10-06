@@ -28,8 +28,8 @@ class RiskLimitsOut(BaseModel):
 class RiskStatusOut(BaseModel):
     trading_mode: str = Field(description="Altijd 'paper'; er wordt hier niet live gehandeld.")
     limits: RiskLimitsOut
-    equity_eur: Decimal
-    one_r_eur: Decimal
+    equity_usd: Decimal
+    one_r_usd: Decimal
     open_risk_r: Decimal
     realized_day_r: Decimal
     realized_week_r: Decimal
@@ -231,6 +231,9 @@ class PaperTradeOut(BaseModel):
     closed_at: UtcDatetime | None
     entry_reason: str
     exit_reason: str | None
+    stop_basis: str
+    stop_distance_pct: Decimal
+    stop_clamped: str | None
     risk_r: Decimal
     units: Decimal
     entry_expected_price: Decimal
