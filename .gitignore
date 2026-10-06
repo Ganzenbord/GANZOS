@@ -31,3 +31,8 @@ logs/
 
 # Build-artefact van TypeScript
 *.tsbuildinfo
+
+# Marktdata van buiten. Hoort niet in de repository: het zijn honderden MB's, en de
+# Binance-dataset staat onder een niet-commerciele licentie die herdistributie bindt aan
+# bronvermelding en dezelfde licentie (zie docs/quant-lab/databronnen.md).
+/data/

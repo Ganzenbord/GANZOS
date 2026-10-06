@@ -144,3 +144,135 @@ In volgorde van wat het meest oplevert:
 
 Optie 1 is het antwoord op de lange termijn. Optie 2 of 3 is de snelste manier om deze week
 iets echts te meten.
+
+---
+
+# Naschrift, 6 oktober 2026: de Binance-weg staat klaar
+
+Je koos optie 2. Hieronder wat er nu staat, wat jij moet omzetten, en wat deze data wél en
+niet kan beantwoorden.
+
+## Wat er gebouwd is
+
+| | |
+| --- | --- |
+| `app/quantlab/sources/binance.py` | de adapter: URL's, het lezen van een ZIP, candles en trades naar ticks |
+| `scripts/quant_binance.py` | `download` (met checksumcontrole) en `import` (zonder netwerk) |
+| `tests/test_quant_binance.py` | 37 tests, offline |
+
+Alles is geverifieerd tegen Binance' **eigen** repo `binance/binance-public-data` — de
+README, `python/utility.py` en `python/enums.py`, gelezen op 6 oktober 2026. Dat is een stap
+verder dan bij de Vybe-adapter, waar ik de vorm uit een voorbeeldimplementatie moest halen.
+De kolomindeling, de URL-opzet, de bestandsnamen, de intervallen en de checksum komen uit
+hun documentatie, niet uit mijn hoofd.
+
+Wat ik **niet** heb kunnen verifiëren: of een echt bestand ook werkelijk zo is. De host is
+nog geblokkeerd, dus er is geen enkele regel echte Binance-data door deze code gegaan. De
+vorm is geverifieerd, de werkelijkheid niet.
+
+## Wat jij moet omzetten
+
+Eén host erbij in de netwerkpolicy van deze omgeving: **`data.binance.vision`**.
+
+In de Claude-app: het menu van de cloud-omgeving in de titelbalk → *Edit* → **Network
+access**. Kies *Custom* en zet `data.binance.vision` bij **Allowed domains** (de
+standaardlijst met pakketbronnen laat je staan), of kies een ruimere toegang. De stappen
+staan bij https://code.claude.com/docs/en/cloud-environments#network-access — ik kan er zelf
+niet bij.
+
+Gemeten vandaag: `HTTP 403` van de proxy, dus nog steeds dicht. Zodra het open is:
+
+```bash
+cd backend
+python -m scripts.quant_binance download --symbol BTCUSDT --interval 1m \
+    --from 2026-09-01 --to 2026-09-30 --dir ../data/binance
+python -m scripts.quant_binance import --symbol BTCUSDT --interval 1m --dir ../data/binance
+```
+
+Gaat het niet open, dan werkt de andere weg ook: download de ZIP's op je eigen Mac of pc
+(een gewone `curl`, geen sleutel nodig), zet ze in een map, en `import` leest ze zonder
+netwerk in. Het script controleert dan nog steeds de checksum.
+
+## Wat deze data wel en niet kan beantwoorden
+
+**Niet H1.** Binance-spot heeft geen nieuwe memecoinpools, geen pooldiepte en geen
+houdersverdeling. De hypothese over tokens van tien minuten oud is hier niet te testen.
+
+**Wel drie dingen die nu open staan:**
+
+1. **Echte volatiliteit in plaats van mijn random walk.** De generator uit fase 2 is te
+   rustig en dat heeft me al een keer genaaid: met een drift van 0,0022 per stap haalde H0
+   +8,0R met honderd procent winrate. Op echte prijzen is zo'n uitkomst meteen verdacht.
+2. **De openstaande vraag uit fase 3**: bindt de ondergrens van 20% in de stopregel ook op
+   echte data bijna altijd, of was dat een artefact van mijn generator? Dat is met
+   minuutcandles van een willekeurig paar te meten.
+3. **De latency-stresstest werkt eindelijk.** Bij een cadans van twintig seconden doet hij
+   niets, want 800 en 1600 milliseconden vallen op dezelfde volgende tick. Binance heeft
+   `1s`-candles, en in de `trades`-bestanden staat elke trade met zijn eigen tijdstempel tot
+   op de microseconde. Daarvoor staat er ook een `BinanceTradesNormalizer`.
+
+## Drie valkuilen die in de code zitten omdat ze echt zijn
+
+**1. De tijdstempels zijn vanaf 1 januari 2025 in MICROseconden, daarvoor in milliseconden.**
+Binance zegt dat zelf in hun README. Reken je met de verkeerde eenheid, dan komt een bestand
+uit 2024 in 1970 terecht en een bestand uit 2025 in het jaar 56000 — en in beide gevallen
+zijn het nog steeds getallen die er plausibel uitzien. `to_datetime()` kiest de eenheid per
+waarde op het aantal cijfers, en weigert een getal dat in geen van beide eenheden een
+plausibel jaar oplevert. Dat is de eerste test in het bestand.
+
+**2. De tick krijgt de slottijd van de candle, niet de openingstijd.** Dit had ik eerst
+andersom en het was fout. De slotkoers was pas waar aan het eind van het interval; zou de
+tick op de openingstijd staan, dan ziet de engine bij minuutcandles zestig seconden lang een
+prijs die nog niet bestaat. Dat is gratis vooruitkijken, en precies het soort fout dat een
+backtest mooi maakt en waardeloos. De test die dit vastlegt, zegt nu ook waarom.
+
+**3. Een paar tegen BTC of ETH is geen dollarprijs.** `BTCUSDT` wel, `ETHBTC` niet. Is het
+quote-token geen dollarstablecoin, dan blijft `price_usd` leeg — dezelfde regel als bij de
+Vybe-adapter, en om dezelfde reden: een prijs in de verkeerde eenheid is erger dan geen
+prijs, want hij is plausibel, hij rekent door, en niemand ziet het.
+
+En net als bij Vybe blijft **`liquidity_usd` leeg**: volume is geen diepte. Het filter
+"liquiditeit minstens 50× de positie" heeft orderboekdiepte nodig, en die staat niet in een
+candle. Leeg laten blokkeert de instap, en dat is de juiste kant om fout te zitten.
+
+## De checksum is wat echte data van nepdata onderscheidt
+
+Ik heb de machinerie vandaag kunnen draaien door zelf een bestand te maken dat de **vorm**
+van een Binance-bestand heeft, met verzonnen prijzen: 1.440 minuutcandles van een dag. Dat
+ging er netjes door — 1.440 events, 1.440 ticks, ketting klopt, oordeel "ok", en de klok
+liep van `00:00:59.999999` tot `23:59:59.999999`.
+
+Wat daarbij opvalt en wat je moet weten: het kwaliteitsrapport meldde **"synthetische
+events: 0"**, terwijl die data wel degelijk verzonnen was. De teller kijkt naar de naam van
+de bron (`synthetic`), en een verzonnen bestand dat onder de naam `binance` binnenkomt, is
+daarmee onzichtbaar. Dat is een blinde vlek en geen bug die ik kan wegprogrammeren: wat een
+bestand bevat, is van buiten niet te zien.
+
+Daarom is die `.CHECKSUM` meer dan netheid. **Het is het enige dat echte data van een
+plausibel ogende nepversie onderscheidt**: alleen Binance kan een bestand publiceren
+waarvan de SHA-256 overeenkomt met de SHA-256 die Binance ernaast publiceert. Het script
+weigert daarom een bestand waarvan de hash niet klopt in plaats van het alsnog te bewaren,
+en de hash van elk ingelezen bestand gaat mee in de ingest-run. Dat laatste is nodig omdat
+Binance zelf zegt dat archiefbestanden later vervangen kunnen worden — dat is twee keer
+gebeurd, op 2022-04-21 en 2022-08-08.
+
+## Eén ding dat je moet weten voordat we hier veel op bouwen
+
+De dataset staat onder **CC BY-NC-SA 4.0 — niet-commercieel**
+(`TERMS_AND_CONDITIONS.md`, versie 1.0, bijgewerkt 26 augustus 2026). In gewone taal, met de
+artikelnummers erbij zodat je het kunt nazoeken:
+
+- **Mag wel** (4.1): "algorithmic historical backtesting for purely personal non-production
+  research". Dat is precies wat dit lab is.
+- **Mag niet** (4.2): gebruiken voor "live proprietary trading execution" of het verkopen
+  van signalen. Dat raakt ons nu niet — er is in dit project geen live handel — maar het
+  betekent wel dat een eventuele latere stap naar echt geld **een andere databron nodig
+  heeft**, of een betaalde licentie bij Binance.
+- **Mag niet** (4.4): verwerken in "commercial trading bot platforms" of betaalde
+  producten. Deze data hoort dus **niet** in het commerciële deel van Broozing terecht te
+  komen.
+- **Verplicht** (4.5): deel je er iets van, dan met bronvermelding naar Binance Vision en
+  onder dezelfde licentie.
+
+De data zelf hoort hierom ook niet in de repository: hij blijft in een map ernaast
+(`data/binance`, buiten git), net als `.env` en `tokens/`.

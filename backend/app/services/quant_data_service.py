@@ -285,7 +285,9 @@ async def normalize_pending(session: AsyncSession) -> tuple[int, int]:
     return ticks, mislukt
 
 
-async def record(session: AsyncSession, *, source: FeedSource) -> IngestResult:
+async def record(
+    session: AsyncSession, *, source: FeedSource, note: str | None = None
+) -> IngestResult:
     """Lees een bron helemaal uit, sla alles op en normaliseer het.
 
     Dit is de eenvoudige vorm, voor een opname van een vast stuk (een bestand, of de
@@ -298,7 +300,10 @@ async def record(session: AsyncSession, *, source: FeedSource) -> IngestResult:
     zonder antwoord.
     """
     gestart = datetime.now(timezone.utc)
-    run = QuantIngestRun(source=source.name, started_at=gestart)
+    # `note` is de herkomst: bij een bestand van buiten de naam en de SHA-256 ervan. Zonder
+    # dat is "we hebben dit gemeten op dit bestand" niet meer na te gaan, en een aanbieder
+    # die een archiefbestand later vervangt (Binance doet dat) blijft dan onzichtbaar.
+    run = QuantIngestRun(source=source.name, started_at=gestart, note=note)
     session.add(run)
     await session.flush()
 
