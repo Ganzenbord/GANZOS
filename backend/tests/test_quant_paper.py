@@ -577,6 +577,37 @@ async def test_geen_enkele_trade_verliest_veel_meer_dan_1r(session) -> None:
     assert slechtste > Decimal("-1.5"), f"slechtste trade was {slechtste}R"
 
 
+async def test_euros_worden_de_juiste_kant_op_omgerekend(session) -> None:
+    """`quant_usd_eur_rate` is de koers dollar naar euro, dus euro naar dollar is delen.
+
+    Dit stond fout: vermenigvuldigen maakte van 1000 euro 920 dollar in plaats van 1087.
+    Op R was dat niet te zien, want 1R en de winst gaan door dezelfde koers en de fout valt
+    weg. Wat er wel misging: de positie in dollars was 15% te klein, dus het filter
+    "liquiditeit minstens 50x de positie" stond te ruim en de slippage viel te laag uit.
+    Precies het soort fout dat zich verstopt achter een getal dat klopt.
+    """
+    from app.models.quantlab import QuantStrategyRun
+    from app.services import quant_paper_service
+    from sqlalchemy import select
+
+    await _corpus(session, duration=timedelta(minutes=30))
+    await quant_paper_service.run_hypothesis(
+        session,
+        hypothesis=h0(),
+        seed=1,
+        safety=AlwaysSafeOracle(),
+        equity_eur=Decimal("1000"),
+        usd_eur_rate=Decimal("0.92"),
+    )
+    await session.commit()
+
+    run = (await session.execute(select(QuantStrategyRun))).scalar_one()
+    # 1000 euro bij 1 dollar = 0,92 euro is 1086,96 dollar.
+    assert run.equity_quote == Decimal("1086.96")
+    # En 1R is daar 0,75% van: 8,15 dollar.
+    assert run.one_r_quote == Decimal("8.15")
+
+
 # --- De stresstest ------------------------------------------------------------
 
 

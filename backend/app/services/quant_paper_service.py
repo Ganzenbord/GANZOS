@@ -133,10 +133,15 @@ async def run_hypothesis(
     instellingen = get_settings()
     equity_eur = equity_eur if equity_eur is not None else instellingen.quant_paper_equity_eur
     koers = usd_eur_rate if usd_eur_rate is not None else instellingen.quant_usd_eur_rate
-    # De papieren equity staat in euro's; de venue rekent in dollars. De koers valt bij R
-    # weg (1R en de winst gaan er beide door), maar hij staat op de run zodat de bedragen
-    # narekenbaar blijven.
-    equity_quote = (equity_eur * koers).quantize(Decimal("0.01"))
+    # De papieren equity staat in euro's; de venue rekent in dollars. `quant_usd_eur_rate`
+    # is de koers dollar naar euro (1 dollar is 0,92 euro), dus van euro naar dollar wordt
+    # er gedeeld en niet vermenigvuldigd.
+    #
+    # Dat stond eerst fout: een vermenigvuldiging maakte van 1000 euro 920 dollar in plaats
+    # van 1087. Op R had dat geen effect — 1R en de winst gaan door dezelfde koers, dus de
+    # fout valt weg — maar de positie in dollars was 15% te klein, en daarmee stond het
+    # filter "liquiditeit minstens 50x de positie" te ruim en viel de slippage te laag uit.
+    equity_quote = (equity_eur / koers).quantize(Decimal("0.01"))
 
     hypothese = await register_hypothesis(session, hypothesis)
     corpus = list(ticks) if ticks is not None else await load_ticks(
