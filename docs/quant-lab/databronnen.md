@@ -276,3 +276,38 @@ artikelnummers erbij zodat je het kunt nazoeken:
 
 De data zelf hoort hierom ook niet in de repository: hij blijft in een map ernaast
 (`data/binance`, buiten git), net als `.env` en `tokens/`.
+
+---
+
+## Op de plank gelegd, 6 oktober 2026
+
+Stef: *"oke leg maar op de plank dit."* Dit staat dus klaar en wacht; er wordt niet verder
+aan gebouwd tot hij het weer oppakt.
+
+**Wat er klaar ligt:** de adapter, het download- en importscript, 38 offline tests. De hele
+testsuite is groen (654 tests). Niets hiervan heeft onderhoud nodig zolang het stilligt.
+
+**Wat er ontbreekt:** één host in de netwerkpolicy, `data.binance.vision`. Dat is alles.
+
+**De eerste drie stappen als het weer opgepakt wordt:**
+
+1. Meet of de host open is (een GET op een `.CHECKSUM`-URL). Een 403 is ook een antwoord.
+2. Controleer of de aannames nog kloppen — zie hieronder, ze hebben een houdbaarheidsdatum.
+3. Eén dag echte minuutcandles van een liquide paar erdoor, en dan de drie vragen uit het
+   naschrift beantwoorden (bindt de 20%-ondergrens, doet de latency-stresstest iets, hoe
+   rustig was mijn generator eigenlijk).
+
+**Wat er in de tussentijd kan verlopen.** Dit is de reden dat stap 2 niet overgeslagen mag
+worden: alles hieronder is op één dag geverifieerd en kan daarna stil verschoven zijn.
+
+| Wat | Geverifieerd op | Waar het staat |
+| --- | --- | --- |
+| Kolomindeling, URL's, intervallen, microseconderegel | 6 oktober 2026 | `binance/binance-public-data` |
+| De licentie (CC BY-NC-SA 4.0, versie 1.0) | 6 oktober 2026 | hun `TERMS_AND_CONDITIONS.md` |
+| De modelprijzen van Claude | 5 oktober 2026 | `app/quantlab/pricing.py` |
+
+**De afspraak.** Er staat een eenmalige herinnering klaar die op **6 april 2027** een nieuwe
+sessie start met de opdracht om hier precies die stappen te doorlopen en het resultaat in
+gewone taal aan Stef te melden. Stef krijgt er een bericht van op zijn telefoon en per
+e-mail. Wil hij ervan af of hem verzetten, dan kan dat bij *Routines* op claude.ai; de
+herinnering heet "Binance-databron Quant Lab: terugkomen na zes maanden".
