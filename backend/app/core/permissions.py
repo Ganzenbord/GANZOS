@@ -74,6 +74,15 @@ PERMISSIONS: tuple[Permission, ...] = (
     Permission(
         "quant.risk.reset", "De weekstop opnieuw zetten na een slechte week", TIER_OWNER, True
     ),
+    # De enige weg waarlangs een voorstel van een agent ooit de regels raakt. Gevoelig, en
+    # alleen de eigenaar: goedkeuren betekent een nieuwe hypothese-versie en een teller die
+    # opnieuw begint.
+    Permission(
+        "quant.hypothesis.write",
+        "Een voorstel goedkeuren en een hypothese-versie vastleggen",
+        TIER_OWNER,
+        True,
+    ),
 )
 
 PERMISSION_MAP: dict[str, Permission] = {perm.key: perm for perm in PERMISSIONS}

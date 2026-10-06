@@ -11,6 +11,7 @@ kost, zou betekenen dat het plafond nooit wordt gehaald en het budget niets doet
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
@@ -19,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.quantlab import QuantLlmCall
 from app.quantlab.agents import QuantAgent
+from app.quantlab.budget_limits import MONTHLY_HARD_CAP_EUR
 from app.quantlab.budget import (
     BudgetStatus,
     BudgetVerdict,
@@ -159,3 +161,111 @@ async def spend_on_day(session: AsyncSession, *, day: date) -> Decimal:
         )
     )
     return Decimal(str(totaal or 0))
+
+
+@dataclass(frozen=True)
+class CostProjection:
+    days_measured: float
+    calls: int
+    spent_eur: Decimal
+    eur_per_day: Decimal
+    projected_month_eur: Decimal
+    monthly_cap_eur: Decimal
+    within_budget: bool
+    per_agent_month_eur: dict[str, Decimal]
+    explanation: str
+
+
+async def cost_projection(
+    session: AsyncSession, *, now: datetime | None = None, days_in_month: int = 30
+) -> CostProjection:
+    """De verwachte maandkosten uit de werkelijke aanroepen (sectie 12, na fase 4).
+
+    Een meting en geen schatting: wat er is uitgegeven, gedeeld door de tijd die werkelijk
+    is gemeten. Komt de projectie boven de 200 euro, dan is het antwoord uit de opdracht
+    ondubbelzinnig — het ontwerp aanpassen, niet het budget.
+
+    Er zit geen marge in. Een projectie met een veiligheidsmarge is een getal waar je niet
+    meer op kunt rekenen, want je weet niet meer welk deel meting is.
+    """
+    nu = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    eerste = await session.scalar(select(func.min(QuantLlmCall.created_at)))
+    laatste = await session.scalar(select(func.max(QuantLlmCall.created_at)))
+    aantal = int(
+        await session.scalar(select(func.count()).select_from(QuantLlmCall)) or 0
+    )
+    uitgegeven = Decimal(
+        str(
+            await session.scalar(
+                select(func.coalesce(func.sum(QuantLlmCall.cost_eur), 0))
+            )
+            or 0
+        )
+    )
+
+    if not aantal or eerste is None or laatste is None:
+        return CostProjection(
+            days_measured=0.0,
+            calls=0,
+            spent_eur=Decimal("0"),
+            eur_per_day=Decimal("0"),
+            projected_month_eur=Decimal("0"),
+            monthly_cap_eur=MONTHLY_HARD_CAP_EUR,
+            within_budget=True,
+            per_agent_month_eur={},
+            explanation=(
+                "Er zijn geen aanroepen geboekt, dus er is geen projectie te maken. Dat is "
+                "geen goed nieuws en geen slecht nieuws: er is nog niets gemeten."
+            ),
+        )
+
+    # Het aantal UTC-dagen waarop er werkelijk is aangeroepen, en niet de tijdspanne
+    # tussen de eerste en de laatste aanroep. Dat scheelt: drie dagen aanroepen geeft een
+    # spanne van twee dagen, en dan komt de dagprijs 50% te hoog uit. Een projectie die
+    # structureel te hoog is, is net zo onbruikbaar als een die te laag is — je weet niet
+    # meer welk deel meting is.
+    dagen_met_aanroepen = int(
+        await session.scalar(
+            select(func.count(func.distinct(func.date(QuantLlmCall.created_at))))
+        )
+        or 0
+    )
+    dagen = float(max(dagen_met_aanroepen, 1))
+    per_dag = (uitgegeven / Decimal(str(dagen))).quantize(Decimal("0.000001"))
+    projectie = (per_dag * Decimal(days_in_month)).quantize(Decimal("0.01"))
+
+    per_agent: dict[str, Decimal] = {}
+    rijen = await session.execute(
+        select(QuantLlmCall.agent, func.coalesce(func.sum(QuantLlmCall.cost_eur), 0))
+        .group_by(QuantLlmCall.agent)
+    )
+    for naam, bedrag in rijen.all():
+        per_agent[str(naam)] = (
+            Decimal(str(bedrag or 0)) / Decimal(str(dagen)) * Decimal(days_in_month)
+        ).quantize(Decimal("0.01"))
+
+    binnen = projectie <= MONTHLY_HARD_CAP_EUR
+    uitleg = (
+        f"Op {int(dagen)} dagen zijn er {aantal} aanroepen geboekt voor "
+        f"EUR {uitgegeven.quantize(Decimal('0.01'))}, dus EUR {per_dag.quantize(Decimal('0.01'))} "
+        f"per dag. Dat projecteert naar EUR {projectie} per maand van {days_in_month} dagen."
+    )
+    if binnen:
+        uitleg += f" Dat blijft onder het plafond van EUR {MONTHLY_HARD_CAP_EUR}."
+    else:
+        uitleg += (
+            f" Dat is boven het plafond van EUR {MONTHLY_HARD_CAP_EUR}. Volgens sectie 12 "
+            "is het antwoord dan het ontwerp aanpassen en niet het budget: minder context "
+            "voor de Reviewer, of de Analyst minder vaak aanroepen."
+        )
+    return CostProjection(
+        days_measured=dagen,
+        calls=aantal,
+        spent_eur=uitgegeven,
+        eur_per_day=per_dag,
+        projected_month_eur=projectie,
+        monthly_cap_eur=MONTHLY_HARD_CAP_EUR,
+        within_budget=binnen,
+        per_agent_month_eur=per_agent,
+        explanation=uitleg,
+    )

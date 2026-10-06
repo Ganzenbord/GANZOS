@@ -461,3 +461,71 @@ class QuantPaperFill(Base):
     )
     fee_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, default=0)
     exit_haircut_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+# --- De agents (fase 4) ------------------------------------------------------
+
+
+class QuantDecisionLog(Base):
+    """Elke beslissing van een beslismodel, inclusief die van een model in de schaduw.
+
+    Een model dat in de schaduw loopt, bepaalt niets (`used=False`) maar wordt wel
+    vastgelegd. Zonder deze rijen kun je de vraag "was het beter geweest" achteraf niet
+    beantwoorden, en dan blijft het bij een claim van de leverancier.
+
+    `outcome` is pas later bekend — als de trade is gesloten. Daarom staat hij apart en mag
+    hij NULL zijn: een lege uitkomst betekent "weten we nog niet", niet "nee".
+    """
+
+    __tablename__ = "quant_decision_log"
+    __table_args__ = (
+        Index("ix_quant_decision_log_model_shadow", "model_name", "shadow"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    hypothesis: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    pool_address: Mapped[str] = mapped_column(String(80), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    score: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
+    used: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    shadow: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    degraded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    outcome: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, default=utcnow, server_default=func.now(), index=True, nullable=False
+    )
+
+
+class QuantProposal(Base):
+    """De inbox van de Reviewer (sectie 6).
+
+    De Reviewer mag nooit config of een hypothese wijzigen. Zijn voorstellen komen hier
+    terecht en blijven hier tot Stef ze goedkeurt of afwijst. Goedkeuren verandert niets
+    rechtstreeks: het levert een nieuwe hypothese-versie op, en dan begint de trade-teller
+    opnieuw.
+
+    Een afgewezen voorstel blijft staan. Weggooien zou betekenen dat je niet meer kunt zien
+    wat je hebt afgewezen en waarom — en dat is precies wat je een half jaar later wil
+    nalezen.
+    """
+
+    __tablename__ = "quant_proposals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    period: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    argument: Mapped[str] = mapped_column(Text, nullable=False)
+    changes_nl: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", index=True)
+    decision_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    decided_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    # Welke hypothese-versie eruit is gekomen, als het voorstel is goedgekeurd.
+    applied_hypothesis_id: Mapped[int | None] = mapped_column(
+        ForeignKey("quant_hypotheses.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, default=utcnow, server_default=func.now(), index=True, nullable=False
+    )

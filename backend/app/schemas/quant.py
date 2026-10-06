@@ -296,3 +296,62 @@ class ExpectancyOut(BaseModel):
     conclusion_allowed: bool
     min_trades: int
     verdict: str
+
+
+# --- De agents (fase 4) ------------------------------------------------------
+
+
+class ReliabilityBinOut(BaseModel):
+    low: Decimal
+    high: Decimal
+    count: int
+    mean_predicted: float
+    observed_rate: float
+    gap: Decimal
+
+
+class ShadowVerdictOut(BaseModel):
+    """Mag dit model meebeslissen? Met de Brier-score en de verdeling erbij."""
+
+    model_name: str
+    hypothesis: str
+    decisions: int
+    with_outcome: int
+    brier: Decimal | None
+    baseline_brier: Decimal | None
+    conclusion_allowed: bool
+    better_than_baseline: bool | None
+    verdict: str
+    bins: list[ReliabilityBinOut]
+
+
+class ProposalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    period: str
+    title: str
+    argument: str
+    changes_nl: str
+    status: str
+    decision_note: str | None
+    decided_at: UtcDatetime | None
+    applied_hypothesis_id: int | None
+    created_at: UtcDatetime
+
+
+class ProposalDecisionIn(BaseModel):
+    note: str = Field(min_length=1, max_length=500)
+    hypothesis_id: int | None = None
+
+
+class CostProjectionOut(BaseModel):
+    days_measured: float
+    calls: int
+    spent_eur: Decimal
+    eur_per_day: Decimal
+    projected_month_eur: Decimal
+    monthly_cap_eur: Decimal
+    within_budget: bool
+    per_agent_month_eur: dict[str, Decimal]
+    explanation: str

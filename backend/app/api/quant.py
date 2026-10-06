@@ -30,6 +30,7 @@ from app.quantlab.dataquality import CHECK_UITLEG, DataCheck, QualityVerdict
 from app.quantlab.risk import VETO_UITLEG, RiskSnapshot, RiskVeto, one_r_amount
 from app.schemas.quant import (
     AgentSpendOut,
+    CostProjectionOut,
     ExpectancyOut,
     HypothesisDetailOut,
     HypothesisOut,
@@ -40,11 +41,15 @@ from app.schemas.quant import (
     IngestRunOut,
     PaperFillOut,
     PaperTradeOut,
+    ProposalDecisionIn,
+    ProposalOut,
+    ReliabilityBinOut,
     KillSwitchOut,
     LlmCallOut,
     RiskEventOut,
     RiskLimitsOut,
     RiskStatusOut,
+    ShadowVerdictOut,
     SignalOut,
     StorageOut,
     StrategyRunOut,
@@ -52,7 +57,9 @@ from app.schemas.quant import (
 from app.services import (
     quant_cost_service,
     quant_data_service,
+    quant_decision_service,
     quant_paper_service,
+    quant_proposal_service,
     quant_risk_service,
 )
 from app.services.activity_service import log_activity
@@ -465,3 +472,134 @@ async def paper_trade_fills(
     if await session.get(QuantPaperTrade, trade_id) is None:
         raise NIET_GEVONDEN
     return list(await quant_paper_service.trade_fills(session, trade_id=trade_id))
+
+
+# --- De agents (fase 4) ------------------------------------------------------
+
+hypothesis_access = require_confirmation("quant.hypothesis.write")
+
+
+@router.get("/costs/projection", response_model=CostProjectionOut)
+async def costs_projection(
+    user: User = Depends(costs_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """De verwachte maandkosten uit de werkelijke aanroepen (sectie 12).
+
+    Een meting en geen schatting. Komt de projectie boven de 200 euro, dan is het antwoord
+    uit de opdracht ondubbelzinnig: het ontwerp aanpassen, niet het budget."""
+    stand = await quant_cost_service.cost_projection(session)
+    return CostProjectionOut(
+        days_measured=stand.days_measured,
+        calls=stand.calls,
+        spent_eur=stand.spent_eur,
+        eur_per_day=stand.eur_per_day,
+        projected_month_eur=stand.projected_month_eur,
+        monthly_cap_eur=stand.monthly_cap_eur,
+        within_budget=stand.within_budget,
+        per_agent_month_eur=stand.per_agent_month_eur,
+        explanation=stand.explanation,
+    )
+
+
+@router.get("/decisions/{model_name}/{hypothesis}", response_model=ShadowVerdictOut)
+async def shadow_verdict(
+    model_name: str,
+    hypothesis: str,
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """Mag dit model meebeslissen?
+
+    Onder honderd beslissingen met een bekende uitkomst staat hier "te vroeg". Daarna is de
+    maatstaf de Brier-score tegen `RulesOnly`: lager is beter gekalibreerd, en haalt het
+    nieuwe model dat niet, dan gaat het uit."""
+    uitslag = await quant_decision_service.shadow_verdict(
+        session, model_name=model_name, hypothesis=hypothesis
+    )
+    return ShadowVerdictOut(
+        model_name=uitslag.model_name,
+        hypothesis=uitslag.hypothesis,
+        decisions=uitslag.decisions,
+        with_outcome=uitslag.with_outcome,
+        brier=uitslag.brier,
+        baseline_brier=uitslag.baseline_brier,
+        conclusion_allowed=uitslag.conclusion_allowed,
+        better_than_baseline=uitslag.better_than_baseline,
+        verdict=uitslag.verdict,
+        bins=[
+            ReliabilityBinOut(
+                low=b.low, high=b.high, count=b.count,
+                mean_predicted=b.mean_predicted, observed_rate=b.observed_rate, gap=b.gap,
+            )
+            for b in uitslag.bins
+        ],
+    )
+
+
+@router.get("/proposals", response_model=list[ProposalOut])
+async def proposals(
+    only_open: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """De inbox van de Reviewer.
+
+    Hij schrijft hier voorstellen in en verandert zelf niets. Een afgewezen voorstel blijft
+    staan, zodat je later kunt nalezen wat je hebt afgewezen en waarom."""
+    if only_open:
+        return list(await quant_proposal_service.open_proposals(session, limit=limit))
+    return list(await quant_proposal_service.recent(session, limit=limit))
+
+
+@router.post("/proposals/{proposal_id}/reject", response_model=ProposalOut)
+async def reject_proposal(
+    proposal_id: int,
+    body: ProposalDecisionIn,
+    user: User = Depends(read_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """Afwijzen met een reden. Verandert niets aan de hypotheses, dus geen bevestiging."""
+    rij = await quant_proposal_service.reject(
+        session, proposal_id=proposal_id, note=body.note, user_id=user.id
+    )
+    if rij is None:
+        raise NIET_GEVONDEN
+    await session.commit()
+    return rij
+
+
+@router.post("/proposals/{proposal_id}/approve", response_model=ProposalOut)
+async def approve_proposal(
+    proposal_id: int,
+    body: ProposalDecisionIn,
+    user: User = Depends(hypothesis_access),
+    session: AsyncSession = Depends(get_session),
+):
+    """Goedkeuren. Gevoelig, want dit is de enige weg waarlangs een voorstel van een agent
+    ooit de regels raakt.
+
+    Ook goedkeuren verandert zelf nog niets: het legt vast dat dit voorstel heeft geleid tot
+    een nieuwe hypothese-versie, en die versie wordt apart geregistreerd met zijn eigen
+    hash. De trade-teller begint dan opnieuw."""
+    rij = await quant_proposal_service.approve(
+        session,
+        proposal_id=proposal_id,
+        note=body.note,
+        hypothesis_id=body.hypothesis_id,
+        user_id=user.id,
+    )
+    if rij is None:
+        raise NIET_GEVONDEN
+    await log_activity(
+        session,
+        action=ActivityAction.QUANT_PROPOSAL_APPROVED,
+        user_id=user.id,
+        message="Voorstel van de Reviewer goedgekeurd",
+        subject_type="quant_proposal",
+        subject_id=rij.id,
+        context={"title": rij.title},
+    )
+    await session.commit()
+    return rij

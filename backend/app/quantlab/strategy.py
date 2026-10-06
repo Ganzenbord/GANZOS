@@ -13,7 +13,7 @@ levert winsten op, en de vraag is of ze meer opleveren dan willekeur.
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -109,3 +109,59 @@ class RandomEntryStrategy:
         if not mogelijk or gooi >= kans:
             return None
         return mogelijk[int(kiezer * len(mogelijk)) % len(mogelijk)]
+
+
+class ScoredEntryStrategy:
+    """Instappen op een score die al is uitgerekend (sectie 6).
+
+    Let op wat deze klasse **niet** doet: hij roept geen model aan. Hij krijgt een kant en
+    klare tabel van pool naar score mee, en past daar een drempel op toe. Dat is geen
+    omslachtigheid maar de kern van de architectuur — sectie 6 zegt dat het entry-besluit
+    alleen reeds opgeslagen scores en deterministische regels gebruikt.
+
+    De scores worden in een aparte ronde gemaakt (`quant_scoring_service`), die wél een
+    model mag aanroepen. Daardoor blijft het pad waarin een trade tot stand komt vrij van
+    alles wat kan wachten, kan falen, of kan antwoorden met iets anders dan afgesproken.
+    Er is een test die de hele importboom naloopt om dat vast te houden.
+    """
+
+    name = "scored_entry"
+
+    def __init__(
+        self,
+        *,
+        scores: Mapping[str, float],
+        threshold: float,
+        min_age_minutes: float,
+        max_age_minutes: float,
+        default_score: float | None = None,
+    ) -> None:
+        self._scores = scores
+        self._threshold = threshold
+        self._min_age = min_age_minutes
+        self._max_age = max_age_minutes
+        # Een pool zonder score doet standaard niet mee. Hem een score geven zou betekenen
+        # dat een ontbrekende meting stilzwijgend een mening wordt.
+        self._default = default_score
+
+    def propose(
+        self,
+        *,
+        moment: datetime,
+        candidates: Sequence[Candidate],
+        step_seconds: float,
+    ) -> Candidate | None:
+        beste: Candidate | None = None
+        beste_score = self._threshold
+        for kandidaat in candidates:
+            if kandidaat.price_usd is None or kandidaat.price_usd <= 0:
+                continue
+            leeftijd = kandidaat.age_minutes(moment)
+            if leeftijd is None or not (self._min_age <= leeftijd <= self._max_age):
+                continue
+            score = self._scores.get(kandidaat.pool_address, self._default)
+            if score is None or score < self._threshold:
+                continue
+            if beste is None or score > beste_score:
+                beste, beste_score = kandidaat, score
+        return beste
