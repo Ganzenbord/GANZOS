@@ -77,6 +77,7 @@ class SyntheticPoolSource:
         defects: set[SyntheticDefect] | frozenset[SyntheticDefect] | None = None,
         new_pool_every_minutes: int | None = None,
         pool_lifetime_minutes: int | None = None,
+        pool_prefix: str = "pool",
     ) -> None:
         self._seed = seed
         self._start_at = start_at
@@ -91,6 +92,9 @@ class SyntheticPoolSource:
         # nieuwe pool bij en houdt een pool na een tijd op — zoals een memecoin dat doet.
         self._new_pool_every = new_pool_every_minutes
         self._lifetime = pool_lifetime_minutes
+        # Een eigen voorvoegsel zodat twee corpora naast elkaar in dezelfde tabellen
+        # kunnen staan zonder dat hun pools op naam samenvallen.
+        self._prefix = pool_prefix
 
     def streams(self) -> tuple[str, ...]:
         return ("ticks",)
@@ -107,8 +111,8 @@ class SyntheticPoolSource:
 
     def _nieuwe_pool(self, nummer: int, moment, toeval: random.Random) -> dict:
         return {
-            "pool": f"pool-{nummer}",
-            "token": f"token-{nummer}",
+            "pool": f"{self._prefix}-{nummer}",
+            "token": f"token-{self._prefix}-{nummer}",
             "created_at": moment,
             "price": Decimal(str(round(toeval.uniform(0.000001, 0.01), 12))),
             "liquidity": Decimal(str(round(toeval.uniform(5_000, 80_000), 2))),
