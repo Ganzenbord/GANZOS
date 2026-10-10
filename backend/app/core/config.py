@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Environment = Literal["development", "test", "production"]
 
@@ -68,7 +68,13 @@ class Settings(BaseSettings):
     # Fernet-sleutel waarmee provider-tokens versleuteld in de database staan.
     encryption_key: str = DEV_ENCRYPTION_KEY
 
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # `NoDecode` is hier geen detail: zonder dat probeert pydantic-settings de waarde uit de
+    # omgeving eerst als JSON te lezen, vóórdat de validator hieronder aan de beurt is. Een
+    # gewone waarde als `https://ganz.example.net` — of zelfs een lege regel, zoals
+    # deploy/ganz.env.example voorschrijft — liet de server dan niet starten.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
 
     # Achtergrondsynchronisatie. Het dashboard leest alleen wat hier is opgehaald,
     # zodat een pagina-refresh nooit een provider aanroept.
@@ -159,8 +165,20 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
+        """Eén naam, een lijst met komma's, of een JSON-lijst — alle drie mogen.
+
+        Een lege waarde betekent "geen andere herkomst toestaan" en dus een lege lijst. Dat
+        is strenger dan alles toestaan, en dat is de goede kant om op te vallen.
+        """
         if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
+            tekst = value.strip()
+            if not tekst:
+                return []
+            if tekst.startswith("["):
+                import json
+
+                return json.loads(tekst)
+            return [item.strip() for item in tekst.split(",") if item.strip()]
         return value
 
     @property

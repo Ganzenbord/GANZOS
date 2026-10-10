@@ -161,8 +161,11 @@ export function IntegrationsCard() {
         {(catalogus ?? []).map((plek, index) => {
           const vorige = (catalogus ?? [])[index - 1]
           const nieuweKop = !vorige || vorige.category !== plek.category
-          const bestaand = perKey.get(plek.key)
           const hier = plek.store === 'integration'
+          // Alleen voor koppelingen die hier thuishoren naar een rij in de kluis kijken.
+          // Zonder deze grens kreeg YouTube een knop "Loskoppelen" terwijl zijn sleutels bij
+          // het kanaal staan — die knop zou dan iets anders weghalen dan wat eronder staat.
+          const bestaand = hier ? perKey.get(plek.key) : undefined
           return (
             <div key={plek.key}>
               {nieuweKop ? (

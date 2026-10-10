@@ -186,18 +186,11 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
           <Route
             path="/integrations"
             element={
-              <ModulePage
-                title="Integraties"
-                endpoint="/integrations"
-                columns={[
-                  { key: 'name', label: 'Integratie' },
-                  { key: 'category', label: 'Soort' },
-                  { key: 'status', label: 'Status', kind: 'status' },
-                  { key: 'status_detail', label: 'Toelichting' },
-                  { key: 'last_checked_at', label: 'Gecontroleerd', kind: 'since' },
-                ]}
-                emptyTitle="Nog niets gekoppeld"
-              />
+              // Hier hoort het koppelscherm zelf, niet een tabel met wat er al staat. Een
+              // tabel laat zien wat je hebt ingevuld; deze pagina laat zien wat er nog
+              // ontbreekt en waar je het invult — en dat is waar je naartoe gaat als je op
+              // "Integraties" klikt.
+              can('integrations.read') ? <IntegrationsCard /> : <Navigate to="/" replace />
             }
           />
           <Route
@@ -264,7 +257,6 @@ function Authenticated({ onSignedOut }: { onSignedOut: () => void }) {
                     <PasswordCard />
                     <PinCard />
                     <DevicesCard />
-                    {can('integrations.read') ? <IntegrationsCard /> : null}
                   </>
                 }
                 columns={[
