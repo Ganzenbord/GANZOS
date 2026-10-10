@@ -67,15 +67,40 @@ goed "PostgreSQL draait"
 # --- De database zelf ---------------------------------------------------------
 stap "De database van Ganz aanmaken"
 
+# Of er een wachtwoord nodig is, hangt niet af van de rol maar van backend/.env: dáár staat
+# de verbinding in. Staat die er niet, dan moeten we er een kunnen zetten — ook als de rol
+# al bestaat. Eerder stopte het script in dat geval met huiswerk ("geef het wachtwoord
+# opnieuw uit"), en dat overkomt precies iedereen die Ganz opnieuw ophaalt naast een
+# database van een eerdere poging.
 bestaat_rol=$(psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='ganz'" postgres || echo "")
-if [ "$bestaat_rol" = "1" ]; then
-  goed "Gebruiker 'ganz' bestaat al"
-  # Het wachtwoord staat in .env; dat laten we dan met rust.
+
+if [ -f backend/.env ]; then
   db_wachtwoord=""
 else
   db_wachtwoord=$(python3.12 -c "import secrets; print(secrets.token_urlsafe(24))")
+fi
+
+if [ "$bestaat_rol" = "1" ] && [ -n "$db_wachtwoord" ]; then
+  # De rol bestaat, maar niets weet nog welk wachtwoord erbij hoort. Een nieuw wachtwoord
+  # uitgeven kan geen kwaad: er zijn geen gegevens die eraan hangen, alleen toegang.
+  psql -q -c "ALTER ROLE ganz LOGIN PASSWORD '${db_wachtwoord}'" postgres
+  goed "Gebruiker 'ganz' bestond al; nieuw wachtwoord uitgegeven"
+  let_op "Draait er elders nog een Ganz op dezelfde database, dan moet die een nieuwe"
+  let_op "GANZ_DATABASE_URL krijgen."
+elif [ "$bestaat_rol" = "1" ]; then
+  goed "Gebruiker 'ganz' bestaat al"
+elif [ -n "$db_wachtwoord" ]; then
   psql -q -c "CREATE ROLE ganz LOGIN PASSWORD '${db_wachtwoord}'" postgres
   goed "Gebruiker 'ganz' aangemaakt"
+else
+  # backend/.env bestaat wél maar de rol niet: dan wijst dat bestand naar een database die
+  # er niet is, en het wachtwoord erin kennen we niet. Dit is het enige geval dat niet
+  # zonder jou op te lossen is.
+  stop "backend/.env bestaat, maar de databasegebruiker 'ganz' niet.
+   Dat bestand wijst dus naar een database die er niet meer is.
+   Makkelijkste oplossing: hernoem backend/.env naar backend/.env.oud en start dit
+   bestand opnieuw. Je maakt dan nieuwe sleutels aan, en elke koppeling (YouTube en de
+   rest) moet daarna opnieuw."
 fi
 
 bestaat_db=$(psql -tAc "SELECT 1 FROM pg_database WHERE datname='ganz'" postgres || echo "")
@@ -92,12 +117,6 @@ stap "De instellingen klaarzetten"
 if [ -f backend/.env ]; then
   goed "backend/.env bestaat al; die blijft zoals hij is"
 else
-  [ -n "$db_wachtwoord" ] || stop \
-    "De database bestond al maar backend/.env niet, dus het databasewachtwoord is onbekend.
-   Geef het opnieuw uit met:
-     psql -c \"ALTER ROLE ganz PASSWORD 'iets-nieuws'\" postgres
-   en zet daarna GANZ_DATABASE_URL in backend/.env."
-
   geheim=$(python3.12 -c "import secrets; print(secrets.token_urlsafe(48))")
   sleutel=$(python3.12 -c "
 import base64, secrets
