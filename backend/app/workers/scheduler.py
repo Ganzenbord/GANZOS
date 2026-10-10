@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.core.config import Settings, get_settings
 from app.core.database import Database
 from app.models.user import User
-from app.services import finance_service, social_service
+from app.services import finance_service, login_guard, social_service
 from app.services.system_service import record_sample
 
 logger = logging.getLogger("ganz.scheduler")
@@ -54,6 +54,23 @@ def sample_system_job() -> None:
     record_sample()
 
 
+async def prune_login_attempts_job(database: Database) -> None:
+    """Oude mislukte inlogpogingen weggooien.
+
+    Zonder deze taak groeit `login_attempts` door, en dan is een rem met een tijdvenster van
+    kwartieren stilletjes een archief van IP-adressen geworden.
+    """
+    async with database.session() as session:
+        try:
+            weg = await login_guard.prune_attempts(session)
+            await session.commit()
+            if weg:
+                logger.info("%s oude inlogpogingen opgeruimd.", weg)
+        except Exception:  # noqa: BLE001 - de scheduler mag hier nooit op stoppen
+            await session.rollback()
+            logger.exception("Opruimen van inlogpogingen mislukt")
+
+
 def start_scheduler(
     database: Database, *, settings: Settings | None = None
 ) -> AsyncIOScheduler | None:
@@ -88,6 +105,15 @@ def start_scheduler(
     )
     scheduler.add_job(
         sample_system_job, "interval", seconds=30, id="system_sample", max_instances=1
+    )
+    scheduler.add_job(
+        prune_login_attempts_job,
+        "interval",
+        args=[database],
+        hours=1,
+        id="prune_login_attempts",
+        coalesce=True,
+        max_instances=1,
     )
     scheduler.start()
     _scheduler = scheduler

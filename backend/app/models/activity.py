@@ -46,6 +46,11 @@ class ActivityAction(StrEnum):
     UPLOAD_FAILED = "UPLOAD_FAILED"
 
     USER_LOGGED_IN = "USER_LOGGED_IN"
+    # Een mislukte inlog, en het moment waarop de rem eroverheen gaat. Dit is het
+    # spoor waar een beveiligingscontrole naar kijkt: losse missers horen erbij,
+    # een reeks niet.
+    USER_LOGIN_FAILED = "USER_LOGIN_FAILED"
+    USER_LOGIN_BLOCKED = "USER_LOGIN_BLOCKED"
     USER_LOGGED_OUT = "USER_LOGGED_OUT"
     SESSION_REVOKED = "SESSION_REVOKED"
     SESSION_REUSE_DETECTED = "SESSION_REUSE_DETECTED"

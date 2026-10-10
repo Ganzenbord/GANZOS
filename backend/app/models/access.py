@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin, UtcDateTime
+from app.models.base import Base, TimestampMixin, UtcDateTime, utcnow
 
 
 class UserSession(Base, TimestampMixin):
@@ -77,3 +77,34 @@ class UserPermission(Base, TimestampMixin):
     granted: Mapped[bool] = mapped_column(Boolean, nullable=False)
     # Waarom deze uitzondering er is. Over een jaar weet niemand het meer.
     note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class LoginAttempt(Base):
+    """Een mislukte inlogpoging, om brute kracht te kunnen afremmen.
+
+    Twee keuzes die uitleg verdienen.
+
+    **Het e-mailadres staat er als afdruk en niet als tekst.** Wie mis tikt is meestal de
+    eigenaar, maar wie aan het proberen is, vult adressen in van mensen die hier geen
+    gebruiker zijn. Die adressen bewaren zou betekenen dat Ganz gegevens verzamelt over
+    mensen die er niets te zoeken hebben. Een afdruk is wél te tellen en niet terug te
+    lezen.
+
+    **Alleen mislukte pogingen.** Een geslaagde inlog staat al in het logboek; die hier ook
+    bewaren zou een tweede plek maken waar staat wie wanneer ergens was, zonder dat het iets
+    tegenhoudt.
+
+    Deze rijen zijn bedoeld om te verdwijnen: zie `prune_attempts()` in
+    `app/services/login_guard.py`. Het tijdvenster waarin ze meetellen is kwartieren, niet
+    maanden.
+    """
+
+    __tablename__ = "login_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # sha256 over het geheim van de server plus het adres in kleine letters.
+    email_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, default=utcnow, server_default=func.now(), index=True, nullable=False
+    )

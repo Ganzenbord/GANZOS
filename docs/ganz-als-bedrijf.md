@@ -243,20 +243,41 @@ tekens context in en een script van 2.500 tokens uit:
 | het goedkope model | $0,04 | **$9** |
 | het dure model | $0,43 | **$92** |
 
-**De video bepaalt alles.** Hier heb ik géén geverifieerde prijs, dus geen getal maar de
-rekensom:
+**De video bepaalt alles, en de lengte bepaalt de video.** De generator wordt VidRush.
+Belangrijkste ding dat ik daarover vond: **VidRush rekent per afgeleverde minuut, niet per
+video** — 55 credits per minuut eindproduct bij hun zwaarste stand, en de duur van de
+*afgeleverde* video telt, niet de gevraagde duur. Dat verandert de rekensom wezenlijk: niet
+"217 video's" maar "217 × de lengte".
 
-| Als een video kost | Dan is dat per maand |
-| --- | --- |
-| € 0,50 | € 108 |
-| € 1 | € 217 |
-| € 5 | € 1.083 |
-| € 20 | € 4.333 |
+Met de prijs die ik kon vinden (ongeveer $1,83 tot $2,72 per afgeleverde minuut):
 
-Dat is een verschil van veertig keer, en het hangt volledig aan één getal dat we nog niet
-kennen. **Daarom is "één kanaal helemaal rond" stap vier en niet stap tien:** die stap
-levert dit getal, en dit getal bepaalt of twintig kanalen een bedrijf is of een hobby met
-een rekening.
+| Lengte per video | Minuten per maand | Per maand |
+| --- | --- | --- |
+| 1 minuut | 217 | **$397 – $589** |
+| 2 minuten | 433 | $793 – $1.179 |
+| 3 minuten | 650 | $1.190 – $1.768 |
+| 5 minuten | 1.083 | $1.983 – $2.947 |
+| 8 minuten | 1.733 | **$3.172 – $4.715** |
+
+Daar staat de belangrijkste keuze van het hele plan in één tabel: **korte video's zijn een
+bedrijf, lange video's op deze schaal zijn een rekening van vier- tot vijfduizend dollar per
+maand.** En het is een keuze die je per kanaal kunt maken.
+
+Twee eerlijke waarschuwingen bij die getallen:
+
+1. **Het is geen officiële API-prijs.** De credits per minuut komen uit hun eigen
+   documentatie, het bedrag per minuut uit een schatting van derden. Reken het na bij het
+   afrekenen, en vraag of er een staffel is: bij 200+ video's per maand is dat een gesprek
+   waard.
+2. **Ik weet niet of VidRush een API heeft.** Hun site en documentatie zijn vanuit deze
+   omgeving onbereikbaar (de naam lost niet eens op), dus ik kon het niet nakijken. Dat is
+   geen detail maar de **belangrijkste openstaande vraag van dit hele plan**: zonder API kan
+   GANZ de fabriek niet draaien en blijft er bij elke video een mens nodig om op een knop te
+   drukken. Bij 217 video's per maand is dat het verschil tussen automatisch en een baan.
+
+**Daarom blijft "één kanaal helemaal rond" stap vier en niet stap tien:** die stap levert
+het werkelijke bedrag per video, en dat bedrag bepaalt of twintig kanalen een bedrijf is of
+een hobby met een rekening.
 
 Let op het verschil met het maandplafond van €200 dat in de labafspraak staat: dat gaat over
 de agents van het lab. De videofabriek is een ander bedrag, en in de tabel hierboven zie je
@@ -264,7 +285,84 @@ waarom dat een echte beslissing is en geen formaliteit.
 
 ---
 
-## 8. "Wanneer is een kanaal niet meer rendabel" — hier is al machinerie voor
+## 8. Samen in één bedrijf, apart in je eigen leven
+
+Je wil dat jij en je broer elk een eigen inlog hebben, samen in het YouTube-project zitten,
+en dat de sport- en voedingscoach gescheiden blijft. Zakelijke modules samen, persoonlijke
+modules bij je account.
+
+**Het inlogscherm bestaat al** en kan meer dan je denkt: eigen account per persoon, vier
+niveaus van rechten, rechten per persoon aan of uit te zetten los van het niveau, een
+tweede bevestiging voor gevoelige handelingen, en ingetrokken-kunnen-worden per apparaat.
+Je broer een account geven kan vandaag.
+
+**Wat er niet is, is het samen.** Alle achtendertig tabellen hangen aan één `user_id`. Als
+je broer vandaag inlogt, ziet hij geen enkel kanaal — niet omdat het verboden is, maar omdat
+die kanalen aan jóuw account hangen. Het is nu dus precies omgekeerd aan wat je wil: alles
+apart, niets samen.
+
+Wat erbij moet is een laag ertussen — noem het een werkruimte. Eén regel bepaalt de rest:
+
+> **Een module hangt óf aan de werkruimte, óf aan de persoon. Nooit aan beide, en nooit aan
+> geen van beide.**
+
+Zo valt het uiteen:
+
+| Samen (werkruimte) | Bij jezelf (account) |
+| --- | --- |
+| kanalen, hun cijfers en hun tokens | sport- en voedingscoach |
+| video's, scripts, uploadschema | je eigen mail |
+| de koppelingen van het bedrijf (video, stem, onderzoek) | je eigen geheugen en gesprekken met GANZ |
+| het logboek van wat er in het bedrijf gebeurde | je eigen takenlijst |
+| het Quant Lab | je pincode, je apparaten, je stemprofiel |
+
+Twee dingen die in geen van beide kolommen vanzelf thuishoren en waar jij over moet
+beslissen:
+
+- **Financiën.** De omzet van de kanalen is zakelijk, maar een privérekening in hetzelfde
+  overzicht is dat niet. Mijn voorstel: de rekening krijgt een vlag en hoort óf bij het
+  bedrijf óf bij jou, per rekening.
+- **De takenlijst.** Een klus voor een kanaal is zakelijk, "tandarts bellen" niet. Dezelfde
+  oplossing: per taak.
+
+En één regel die ik erbij zou zetten omdat hij later niet meer in te bouwen is: **wat in de
+persoonlijke kolom staat, is voor de ander niet te zien — ook niet voor de eigenaar van de
+werkruimte.** Anders is "gescheiden" een woord zonder inhoud. Dat betekent dat de hoogste
+rechten in het bedrijf je nog steeds niet bij het voedingsschema van je broer brengen, en
+dat is precies de bedoeling.
+
+Dit is een echte verbouwing: een tabel erbij, een kolom op de zakelijke tabellen, en elke
+query die nu op `user_id` filtert moet meeverhuizen. Het is goed te doen en het is beter om
+het te doen met twee accounts en twintig kanalen dan later met meer. Maar het is geen
+middagje.
+
+---
+
+## 9. Meerdere Google-projecten tegelijk: ja, en zo
+
+Dat kan, en het is klein werk vergeleken met het vorige punt. Vandaag staan
+`youtube_client_id` en `youtube_client_secret` als één waarde in de instellingen — één
+project voor de hele server, terwijl §5a er twee tot vier vraagt.
+
+Wat er moet gebeuren:
+
+1. **Een project wordt een rij** in plaats van een instelling: naam, client-ID en secret
+   (versleuteld, zoals alle andere sleutels).
+2. **Elk kanaal wijst naar het project waarmee het gekoppeld is.** Dit is het punt waar het
+   fout kan gaan: een OAuth-token van project A werkt niet onder project B. Wie dit later
+   splitst, laat elk kanaal opnieuw toestemming geven — dus dit moet erin voordat de twintig
+   kanalen gekoppeld worden, niet erna.
+3. **Een puntenteller per project per dag**, en het uploadschema dat weigert te publiceren
+   als het dagbudget vol is. Zonder die teller merk je de grens pas als een upload mislukt,
+   en dan staat de video wel klaar en het schema niet meer.
+
+Dat derde punt is de reden dat dit nú eenvoudig is en later lastig: een puntenteller die je
+achteraf inbouwt, moet ook kunnen uitleggen waarom er gisteren drie video's niet de deur uit
+zijn gegaan.
+
+---
+
+## 10. "Wanneer is een kanaal niet meer rendabel" — hier is al machinerie voor
 
 Dit is dezelfde vraag als die van het Quant Lab, en daar is hij al een paar keer fout
 gegaan op manieren die ik kan laten zien:
@@ -296,7 +394,7 @@ eerlijke antwoord "nog te vroeg" — en dat is een echt antwoord.
 
 ---
 
-## 9. De persoonlijke assistent
+## 11. De persoonlijke assistent
 
 | Wat | Hoe moeilijk | Waar ik op zou letten |
 | --- | --- | --- |
@@ -308,7 +406,7 @@ eerlijke antwoord "nog te vroeg" — en dat is een echt antwoord.
 
 ---
 
-## 10. De volgorde die ik zou aanhouden
+## 12. De volgorde die ik zou aanhouden
 
 1. **Het brein aansluiten.** Een modelclient, met het kostenboek dat er al staat eraan
    vastgeknoopt — dus vanaf de eerste aanroep weet je wat het kost. Zonder deze stap heeft
@@ -334,7 +432,7 @@ zit maar één onbekend getal.
 
 ---
 
-## 11. Wat ik van jou nodig heb
+## 13. Wat ik van jou nodig heb
 
 1. **Een `ANTHROPIC_API_KEY` op de server.** Dit is de grootste ontgrendeling van de hele
    lijst: hij maakt stap 1 mogelijk, en daarmee alles erna.
@@ -343,9 +441,13 @@ zit maar één onbekend getal.
    of één project plus een quotaverhoging. Kijk daar meteen die grens van 100 uploads per
    dag na. En laat mij dan die ene instelling per groep kanalen maken in plaats van één voor
    de hele server; achteraf splitsen kost elk kanaal een nieuwe toestemming.
-4. **Een keuze voor de videoaanbieder, met een bedrag per video dat je acceptabel vindt.**
-   Dat laatste getal is belangrijker dan de aanbieder: het bepaalt of de fabriek kan
-   draaien.
+4. **Van VidRush: heeft het een API?** Kijk in hun documentatie of er endpoints en een
+   API-sleutel zijn (ik kan er vanuit hier niet bij). Zonder API kan GANZ de fabriek niet
+   draaien. Vraag er meteen naar een staffel bij 200+ video's per maand.
+5. **Een lengte per kanaal.** Zie de tabel in §7: dat is bij VidRush het verschil tussen
+   ongeveer $400 en $4.700 per maand, en het is de goedkoopste knop die je hebt.
+6. **Een account voor je broer, en een beslissing over financiën en taken** — zakelijk of
+   persoonlijk, zie §8.
 
 Nog iets wat openstaat uit het Quant Lab en hier nu ook speelt: het maandplafond van €200
 dat in de labafspraak staat, gaat over de agents van het lab. Als het brein straks ook de

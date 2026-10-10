@@ -55,6 +55,16 @@ class Settings(BaseSettings):
     confirmation_max_failures: int = 5
     confirmation_lockout_minutes: int = 15
 
+    # --- De rem op het raden van wachtwoorden -------------------------------
+    # Drie grenzen, want één is of te streng of te slap; de uitleg staat in
+    # app/services/login_guard.py. De strenge grens geldt per adres én IP samen: zou vijf
+    # keer mis een account dichtzetten, dan kan iedereen die jouw adres kent jou
+    # buitensluiten wanneer hij wil.
+    login_max_failures_per_pair: int = 5
+    login_max_failures_per_ip: int = 25
+    login_max_failures_per_account: int = 50
+    login_lockout_minutes: int = 15
+
     # Fernet-sleutel waarmee provider-tokens versleuteld in de database staan.
     encryption_key: str = DEV_ENCRYPTION_KEY
 

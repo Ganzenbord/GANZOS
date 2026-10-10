@@ -31,7 +31,7 @@ from app.schemas.auth import (
 )
 from app.core.security import create_token, hash_password, verify_password
 from app.models.confirmation import ConfirmationMethod
-from app.services import confirmation_service, session_service
+from app.services import confirmation_service, login_guard, session_service
 from app.utils.pin import InvalidPinError, validate_pin
 from app.services.activity_service import log_activity
 
@@ -54,14 +54,51 @@ def _herkomst(request: Request) -> tuple[str | None, str | None]:
 async def login(
     payload: LoginRequest, request: Request, session: AsyncSession = Depends(get_session)
 ):
-    user = await session.scalar(select(User).where(User.email == payload.email.lower()))
+    settings = get_settings()
+    ip, agent = _herkomst(request)
+    adres = payload.email.lower()
+
+    # Eerst de rem, dan het wachtwoord. Andersom zou betekenen dat elke poging nog steeds
+    # een volledige wachtwoordcontrole kost, en dat is precies de rekenkracht die je een
+    # aanvaller niet wil geven.
+    oordeel = await login_guard.check(session, email=adres, ip=ip, settings=settings)
+    if not oordeel.allowed:
+        await log_activity(
+            session,
+            action=ActivityAction.USER_LOGIN_BLOCKED,
+            user_id=None,
+            message="Een inlogpoging is afgeremd na te veel mislukte pogingen.",
+            # Geen e-mailadres in het logboek: wie aan het proberen is, vult adressen in van
+            # mensen die hier geen gebruiker zijn. Wél welke grens eroverheen ging en vanaf
+            # welk IP, want dat is waar je naar kijkt.
+            context={"grens": oordeel.reason, "ip": ip},
+        )
+        await session.commit()
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Te vaak mis. Probeer het over {oordeel.retry_after_minutes} minuten opnieuw.",
+            headers={"Retry-After": str(oordeel.retry_after_minutes * 60)},
+        )
+
+    user = await session.scalar(select(User).where(User.email == adres))
     # Eén en dezelfde melding voor een onbekend e-mailadres en een fout wachtwoord,
     # zodat je niet kunt aftasten welke accounts bestaan.
     if user is None or not user.active or not verify_password(payload.password, user.password_hash):
+        await login_guard.record_failure(session, email=adres, ip=ip, settings=settings)
+        await log_activity(
+            session,
+            action=ActivityAction.USER_LOGIN_FAILED,
+            # Bestaat het account, dan hangt de regel eraan; zo niet, dan aan niemand. Het
+            # adres zelf gaat ook hier niet mee.
+            user_id=user.id if user is not None else None,
+            message="Een inlogpoging is mislukt.",
+            context={"ip": ip},
+        )
+        await session.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "E-mailadres of wachtwoord klopt niet")
 
-    settings = get_settings()
-    ip, agent = _herkomst(request)
+    # Geslaagd: de teller van dit adres vanaf dit IP op nul.
+    await login_guard.clear(session, email=adres, ip=ip, settings=settings)
     sessie, vernieuwtoken = await session_service.create(
         session,
         user=user,
