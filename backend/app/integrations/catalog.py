@@ -25,6 +25,13 @@ De drie bewaarplaatsen:
 Een nieuwe functie toevoegen betekent: hier een regel erbij, en in de functie zelf
 `integration_service.require_credentials()` aanroepen. Dan verschijnt hij automatisch in
 het koppeloverzicht, inclusief wat er nog mist.
+
+Eén ding dat hier nog niet goed staat en dat je moet weten: de kluis is **per gebruiker**.
+Een abonnement van het bedrijf — VidRush, Nexlev — hoort bij de werkruimte en niet bij één
+persoon, want dan moet de ander hem opnieuw invullen en betaal je twee keer. Die laag
+bestaat nog niet (zie `docs/ganz-als-bedrijf.md`, "Samen in één bedrijf"). Tot die er is
+staan deze sleutels bij degene die ze invult, en dat is een bewuste tussenstand en geen
+ontwerp.
 """
 
 from __future__ import annotations
@@ -160,24 +167,49 @@ CATALOG: tuple[Capability, ...] = (
 
     # --- Productie: de videofabriek ------------------------------------------
     Capability(
-        key="script_onderzoek",
-        name="Scriptonderzoek (zoeken op het web)",
+        key="vidrush",
+        name="VidRush",
         category="productie",
-        purpose="Onderwerpen en bronnen opzoeken voor een script.",
+        purpose="Het beeld bij een script. Dit is de duurste stap van de hele fabriek.",
         store=Store.INTEGRATION,
-        fields=(CredentialField("api_key", "API-sleutel"),),
-        note="Nog geen aanbieder gekozen. Zonder dit kan Ganz alleen schrijven wat het model "
-             "al weet, en dat is per definitie oud nieuws.",
+        fields=(
+            CredentialField("api_key", "API-sleutel"),
+            CredentialField("workspace_id", "Werkruimte- of project-ID", masked=False,
+                            hint="Alleen als VidRush daarmee werkt; anders leeg laten."),
+        ),
+        docs_url="https://docs.vidrush.ai/",
+        note="Nog niets aangesloten; er is nog geen client in Ganz. Twee dingen om bij het "
+             "invullen na te kijken, want ik kon hun site vanuit de server niet bereiken: "
+             "hoe de velden écht heten, en of er een API is. VidRush rekent per afgeleverde "
+             "minuut, dus de lengte per kanaal bepaalt de rekening.",
     ),
     Capability(
-        key="video_generatie",
-        name="Videogeneratie",
+        key="nexlev",
+        name="Nexlev",
         category="productie",
-        purpose="Beeld maken bij een script.",
+        purpose=(
+            "Niche- en kanaalonderzoek: wat werkt in een niche, welke kanalen groeien, "
+            "welke video's het boven verwachting doen, en wat een niche per 1.000 "
+            "weergaven opbrengt."
+        ),
         store=Store.INTEGRATION,
         fields=(CredentialField("api_key", "API-sleutel"),),
-        note="Aanbieder nog te kiezen (Higgsfield was het idee). Dit is de duurste stap per "
-             "video en hoort dus in het kostenboek.",
+        docs_url="https://nexlev.io/",
+        note="Nog niets aangesloten. Dit is de bron waarmee de keuze van een niche een "
+             "meting wordt in plaats van een gevoel — en daarmee het tegengif tegen het "
+             "probleem uit het Quant Lab: met tien video's weet je nog niets over een "
+             "kanaal, maar over een niche is er wél data van anderen.",
+    ),
+    Capability(
+        key="web_onderzoek",
+        name="Scriptonderzoek (feiten en bronnen)",
+        category="productie",
+        purpose="Feiten en bronnen opzoeken voor de inhoud van een script.",
+        store=Store.INTEGRATION,
+        fields=(CredentialField("api_key", "API-sleutel"),),
+        note="Iets anders dan Nexlev: dat gaat over wat werkt, dit over wat waar is. "
+             "Aanbieder nog te kiezen. Zonder dit kan Ganz alleen schrijven wat het model al "
+             "weet, en dat is per definitie oud nieuws.",
     ),
     Capability(
         key="stem_generatie",
@@ -187,6 +219,31 @@ CATALOG: tuple[Capability, ...] = (
         store=Store.INTEGRATION,
         fields=(CredentialField("api_key", "API-sleutel"),),
         docs_url="https://elevenlabs.io/",
+        note="Nog niets aangesloten. Let op de lengte: bij video's van een kwartier is dit "
+             "per video een flink stuk tekst, en de meeste aanbieders rekenen per teken.",
+    ),
+    Capability(
+        key="thumbnails",
+        name="Thumbnails",
+        category="productie",
+        purpose="Het plaatje waarop iemand klikt.",
+        store=Store.INTEGRATION,
+        fields=(CredentialField("api_key", "API-sleutel"),),
+        note="Nog niets aangesloten, en goedkoop vergeleken met de rest: een plaatje kost "
+             "centen waar een minuut video dollars kost. Bij twintig kanalen met elk een "
+             "eigen beeldtaal is dit wel twintig keer een andere stijl.",
+    ),
+    Capability(
+        key="muziek_licentie",
+        name="Muziek met licentie",
+        category="productie",
+        purpose="Audio waarvan je de rechten kunt aantonen.",
+        store=Store.INTEGRATION,
+        fields=(CredentialField("api_key", "API-sleutel"),),
+        note="Nog niets aangesloten. Dit is geen luxe maar de verzekering voor de "
+             "muziekkanalen: Content ID herkent opnames automatisch, en een claim kan de "
+             "opbrengst van een video naar de rechthebbende laten gaan zonder dat je het "
+             "merkt. Een licentie die je kunt aantonen is het enige antwoord.",
     ),
 
     # --- Assistent: praten met Ganz, en de rest ------------------------------
@@ -230,6 +287,21 @@ CATALOG: tuple[Capability, ...] = (
         docs_url="https://console.cloud.google.com/apis/credentials",
         note="Nog niets aangesloten. Let op het verschil tussen lezen en versturen: lezen is "
              "terug te draaien, een verzonden mail niet.",
+    ),
+    Capability(
+        key="agenda",
+        name="Agenda",
+        category="assistent",
+        purpose="Je dag kennen, en een afspraak of reservering erin zetten.",
+        store=Store.INTEGRATION,
+        fields=(
+            CredentialField("client_id", "Client-ID", masked=False),
+            CredentialField("client_secret", "Client secret"),
+            CredentialField("refresh_token", "Refresh token"),
+        ),
+        docs_url="https://console.cloud.google.com/apis/credentials",
+        note="Nog niets aangesloten. Zelfde Google-project als de mail kan, maar het is een "
+             "aparte toestemming: lezen van je agenda en erin schrijven zijn twee dingen.",
     ),
     Capability(
         key="telefonie",

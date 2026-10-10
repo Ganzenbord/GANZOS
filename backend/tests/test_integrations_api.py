@@ -282,3 +282,43 @@ async def test_een_functie_zonder_sleutel_zegt_dat_ook(
     assert binance["state"] == "no_key_needed"
     assert binance["fields"] == []
     assert binance["note"]
+
+
+async def test_de_fabriek_staat_in_de_catalogus(client: AsyncClient, owner: User) -> None:
+    """Elke stap van de videofabriek moet een plek hebben om een sleutel in te vullen,
+    anders ontdek je pas halverwege dat er een ontbreekt."""
+    body = (await client.get("/integrations/catalog", headers=auth_headers(owner))).json()
+    per_key = {regel["key"]: regel for regel in body}
+
+    for sleutel in ("vidrush", "nexlev", "web_onderzoek", "stem_generatie", "thumbnails",
+                    "muziek_licentie", "mail", "agenda", "slack", "telegram", "anthropic"):
+        assert sleutel in per_key, sleutel
+        assert per_key[sleutel]["purpose"], sleutel
+        # Niets hiervan is aangesloten; dat hoort zichtbaar te zijn en niet verstopt.
+        assert per_key[sleutel]["wired"] is False, sleutel
+        assert per_key[sleutel]["note"], sleutel
+
+
+async def test_vidrush_vraagt_om_meer_dan_een_sleutel(client: AsyncClient, owner: User) -> None:
+    """Een werkruimte-ID is geen geheim en hoort dus niet als wachtwoordveld op het scherm.
+    Zou alles gemaskeerd zijn, dan kun je niet zien of je het goed hebt getypt."""
+    body = (await client.get("/integrations/catalog", headers=auth_headers(owner))).json()
+    vidrush = [r for r in body if r["key"] == "vidrush"][0]
+    velden = {veld["name"]: veld for veld in vidrush["fields"]}
+    assert velden["api_key"]["masked"] is True
+    assert velden["workspace_id"]["masked"] is False
+
+
+async def test_de_koppelingen_zijn_per_categorie_gegroepeerd(
+    client: AsyncClient, owner: User
+) -> None:
+    """Het scherm zet een kop neer zodra de categorie verandert. Staan de regels door elkaar,
+    dan krijg je dezelfde kop vijf keer."""
+    body = (await client.get("/integrations/catalog", headers=auth_headers(owner))).json()
+    volgorde = [regel["category"] for regel in body]
+    gezien: list[str] = []
+    for categorie in volgorde:
+        if not gezien or gezien[-1] != categorie:
+            assert categorie not in gezien, f"{categorie} komt twee keer los voor"
+            gezien.append(categorie)
+    assert gezien == ["kanalen", "productie", "assistent", "modellen", "geld", "lab"]

@@ -246,34 +246,52 @@ tekens context in en een script van 2.500 tokens uit:
 **De video bepaalt alles, en de lengte bepaalt de video.** De generator wordt VidRush.
 Belangrijkste ding dat ik daarover vond: **VidRush rekent per afgeleverde minuut, niet per
 video** — 55 credits per minuut eindproduct bij hun zwaarste stand, en de duur van de
-*afgeleverde* video telt, niet de gevraagde duur. Dat verandert de rekensom wezenlijk: niet
-"217 video's" maar "217 × de lengte".
+*afgeleverde* video telt, niet de gevraagde duur. De rekensom is dus niet "217 video's" maar
+"217 × de lengte".
 
-Met de prijs die ik kon vinden (ongeveer $1,83 tot $2,72 per afgeleverde minuut):
+Met de prijs die ik kon vinden (ongeveer $1,83 tot $2,72 per afgeleverde minuut), en met de
+lengtes die je wil:
 
-| Lengte per video | Minuten per maand | Per maand |
+| Wat | Minuten per maand | Per maand |
 | --- | --- | --- |
-| 1 minuut | 217 | **$397 – $589** |
-| 2 minuten | 433 | $793 – $1.179 |
-| 3 minuten | 650 | $1.190 – $1.768 |
-| 5 minuten | 1.083 | $1.983 – $2.947 |
-| 8 minuten | 1.733 | **$3.172 – $4.715** |
+| 20 kanalen × 15 minuten | 3.250 | **$5.950 – $8.840** |
+| één slaapkanaal van 1,5 uur | 975 | $1.780 – $2.650 |
+| één slaapkanaal van 2 uur | 1.300 | $2.380 – $3.540 |
+| één slaapkanaal van 3 uur | 1.950 | $3.570 – $5.300 |
+| **samen: 20 × 15 min plus drie slaapkanalen van 2 uur** | **7.150** | **$13.080 – $19.450** |
 
-Daar staat de belangrijkste keuze van het hele plan in één tabel: **korte video's zijn een
-bedrijf, lange video's op deze schaal zijn een rekening van vier- tot vijfduizend dollar per
-maand.** En het is een keuze die je per kanaal kunt maken.
+Dat is tussen de dertien- en negentienduizend dollar per maand aan beeld alleen. Daar komt
+de stem nog bij, en die rekent meestal per teken — bij een kwartier video is dat een flink
+stuk tekst.
 
-Twee eerlijke waarschuwingen bij die getallen:
+### Waarom dat getal niet het eindantwoord hoeft te zijn
 
-1. **Het is geen officiële API-prijs.** De credits per minuut komen uit hun eigen
-   documentatie, het bedrag per minuut uit een schatting van derden. Reken het na bij het
-   afrekenen, en vraag of er een staffel is: bij 200+ video's per maand is dat een gesprek
-   waard.
-2. **Ik weet niet of VidRush een API heeft.** Hun site en documentatie zijn vanuit deze
-   omgeving onbereikbaar (de naam lost niet eens op), dus ik kon het niet nakijken. Dat is
-   geen detail maar de **belangrijkste openstaande vraag van dit hele plan**: zonder API kan
-   GANZ de fabriek niet draaien en blijft er bij elke video een mens nodig om op een knop te
-   drukken. Bij 217 video's per maand is dat het verschil tussen automatisch en een baan.
+Twee dingen die dit terug kunnen brengen, en de tweede is de belangrijkste van dit hele
+document.
+
+**1. Het abonnement.** Je neemt de hoogste. Alleen: een abonnement is een hoeveelheid
+credits, geen vrijbrief — en VidRush' eigen documentatie zegt dat je daarná op een tarief
+komt dat *hoger* ligt per minuut. De twee getallen die je dus moet opzoeken voordat je iets
+bouwt: **hoeveel credits zitten er in de hoogste laag, en wat kost een minuut daarboven.**
+7.150 minuten per maand is 393.000 credits bij 55 per minuut. Als de hoogste laag daar ruim
+onder zit, is bovenstaande tabel optimistisch en niet pessimistisch.
+
+**2. Een slaapvideo van drie uur hoor je niet te genereren.** Dit is waar het echte geld
+zit. Ambient content van uren bestaat niet uit uren verschillend beeld — het is een korte
+scène die wordt herhaald, langzaam verschoven of uitgerekt, met een lange audiolaag
+eronder. Dat samenstellen doe je met ffmpeg op je eigen machine, en dat kost **niets** per
+minuut.
+
+| Drie slaapkanalen van 2 uur | Per maand |
+| --- | --- |
+| elke minuut gegenereerd | $2.380 – $3.540 **per kanaal** |
+| 5 minuten gegenereerd, de rest samengesteld | **$300 – $440 voor alle drie samen** |
+
+Dat is een factor twintig, en het verschil is niet de kwaliteit maar de bouwwijze. Wat je
+dus bij VidRush moet nagaan: **wat is de maximale lengte van één generatie?** Grote kans dat
+drie uur in één keer helemaal niet kan, en dan is samenstellen niet een bezuiniging maar de
+enige weg. Voor de kanalen van een kwartier geldt hetzelfde in mindere mate: hoeveel van die
+vijftien minuten moet echt nieuw beeld zijn?
 
 **Daarom blijft "één kanaal helemaal rond" stap vier en niet stap tien:** die stap levert
 het werkelijke bedrag per video, en dat bedrag bepaalt of twintig kanalen een bedrijf is of
@@ -441,11 +459,16 @@ zit maar één onbekend getal.
    of één project plus een quotaverhoging. Kijk daar meteen die grens van 100 uploads per
    dag na. En laat mij dan die ene instelling per groep kanalen maken in plaats van één voor
    de hele server; achteraf splitsen kost elk kanaal een nieuwe toestemming.
-4. **Van VidRush: heeft het een API?** Kijk in hun documentatie of er endpoints en een
-   API-sleutel zijn (ik kan er vanuit hier niet bij). Zonder API kan GANZ de fabriek niet
-   draaien. Vraag er meteen naar een staffel bij 200+ video's per maand.
-5. **Een lengte per kanaal.** Zie de tabel in §7: dat is bij VidRush het verschil tussen
-   ongeveer $400 en $4.700 per maand, en het is de goedkoopste knop die je hebt.
+4. **Van VidRush, drie dingen** (hun site is vanuit de server onbereikbaar, dus ik kon het
+   niet nakijken, en het is belangrijker dan de prijs):
+   - **Is er een API?** Zonder API kan GANZ de fabriek niet draaien en is er bij elke video
+     een mens nodig. Bij 217 per maand is dat het verschil tussen automatisch en een baan.
+   - **Hoeveel credits zitten er in de hoogste laag, en wat kost een minuut daarboven?**
+     7.150 minuten is 393.000 credits.
+   - **Wat is de maximale lengte van één generatie?** Dit bepaalt of een slaapvideo
+     samengesteld moet worden, en dat scheelt een factor twintig (§7).
+5. **Een lengte per kanaal, en per kanaal hoeveel daarvan nieuw beeld is.** Dat is de
+   goedkoopste knop die je hebt.
 6. **Een account voor je broer, en een beslissing over financiën en taken** — zakelijk of
    persoonlijk, zie §8.
 
