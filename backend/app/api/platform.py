@@ -22,7 +22,7 @@ from app.models.platform import (
     Workflow,
 )
 from app.models.user import User
-from app.schemas.dashboard import CoreOut, LlmStatusOut, MemoryInsightsOut, MissionOut, SystemOut
+from app.schemas.dashboard import CoreOut, LlmStatusOut, MemoryOut, MissionOut, SystemOut
 from app.schemas.platform import (
     ConversationOut,
     IntegrationOut,
@@ -96,7 +96,7 @@ async def missions(
     ]
 
 
-@router.get("/memory", response_model=MemoryInsightsOut)
+@router.get("/memory", response_model=MemoryOut)
 async def memory(
     limit: int = Query(default=50, ge=1, le=500),
     user: User = Depends(require_permission("memory.read")),

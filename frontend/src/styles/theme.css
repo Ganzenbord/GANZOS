@@ -451,6 +451,8 @@ input, select, textarea { font: inherit; }
 
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field__label { font-size: 11.5px; color: var(--text-muted); }
+/* Uitleg onder een invoerveld: waar je deze sleutel vindt, of hoe hij begint. */
+.field__hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
 .input, .select {
   background: var(--bg);

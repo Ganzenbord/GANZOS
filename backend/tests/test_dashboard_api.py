@@ -370,6 +370,40 @@ async def test_memory_overview_vraagt_om_het_juiste_recht(
     ).status_code == 403
 
 
+# --- /memory -----------------------------------------------------------------
+
+
+async def test_memory_geeft_de_aantallen_en_de_notities(
+    client: AsyncClient, owner: User, session
+) -> None:
+    """Dit endpoint gaf een harde 500 bij iedere aanroep: het beloofde in zijn
+    response_model alleen de twee aantallen, maar gaf aantallen *en* notities terug. Zonder
+    test viel dat niet op, want de andere tests raakten alleen /memory/overview."""
+    session.add_all(
+        [
+            MemoryEntry(user_id=owner.id, title="Koffie", content="Zonder suiker",
+                        importance=5),
+            MemoryEntry(user_id=owner.id, title="Broer", content="Heet ook Ganz"),
+            Conversation(user_id=owner.id, title="Eerste gesprek"),
+        ]
+    )
+    await session.commit()
+
+    antwoord = await client.get("/memory", headers=auth_headers(owner))
+
+    assert antwoord.status_code == 200
+    body = antwoord.json()
+    assert body["insights"] == {"memories": 2, "sessions": 1}
+    # Belangrijkste eerst: dat is de ordening waar het endpoint om vraagt.
+    assert [notitie["title"] for notitie in body["entries"]] == ["Koffie", "Broer"]
+    assert body["entries"][0]["content"] == "Zonder suiker"
+    assert body["entries"][0]["importance"] == 5
+
+
+async def test_memory_vraagt_om_het_juiste_recht(client: AsyncClient, limited: User) -> None:
+    assert (await client.get("/memory", headers=auth_headers(limited))).status_code == 403
+
+
 # --- /skills/active ----------------------------------------------------------
 
 

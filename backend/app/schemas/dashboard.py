@@ -77,6 +77,27 @@ class MemoryInsightsOut(BaseModel):
     sessions: int
 
 
+class MemoryEntryOut(BaseModel):
+    id: int
+    kind: str
+    title: str
+    content: str
+    importance: int
+    created_at: UtcDatetime | None = None
+
+
+class MemoryOut(BaseModel):
+    """Wat /memory teruggeeft: de aantallen en de notities zelf.
+
+    Dit stond er eerst niet, en het endpoint beloofde alleen `MemoryInsightsOut` — de twee
+    aantallen. Omdat het wel degelijk ook de notities teruggaf, liep elke aanroep op een 500.
+    De aantallen apart houden blijft nodig: het dashboard gebruikt alleen die.
+    """
+
+    insights: MemoryInsightsOut
+    entries: list[MemoryEntryOut]
+
+
 class LlmStatusOut(BaseModel):
     provider: str
     model: str | None

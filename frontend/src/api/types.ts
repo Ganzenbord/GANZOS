@@ -203,6 +203,38 @@ export interface Dashboard {
   feed: FeedItem[]
 }
 
+/** Eén in te vullen veld van een koppeling.
+ *
+ *  `masked` heet met opzet niet `secret`: er zit geen geheim in dit object, het zegt alleen
+ *  of het invoerveld een wachtwoordveld moet zijn. */
+export interface CredentialField {
+  name: string
+  label: string
+  masked: boolean
+  hint: string | null
+}
+
+/** Eén functie van Ganz met de sleutels die hij nodig heeft.
+ *
+ *  Let op `wired`: staat die op false, dan staat de plek klaar maar doet invullen nog
+ *  niets. Dat hoort op het scherm te staan in plaats van dat je het ontdekt doordat er
+ *  niets gebeurt. */
+export interface Capability {
+  key: string
+  name: string
+  category: string
+  purpose: string
+  store: 'integration' | 'channel' | 'account' | 'server'
+  where: string
+  docs_url: string | null
+  wired: boolean
+  note: string | null
+  state: 'connected' | 'incomplete' | 'missing' | 'elsewhere' | 'no_key_needed'
+  /** Alleen de namen van wat nog leeg is. Nooit een waarde. */
+  missing_fields: string[]
+  fields: CredentialField[]
+}
+
 export interface Integration {
   id: number
   key: string

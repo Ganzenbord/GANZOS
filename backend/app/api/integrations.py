@@ -14,10 +14,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_confirmation
+from app.api.deps import require_confirmation, require_permission
+from app.core.config import get_settings
 from app.core.database import get_session
 from app.models.user import User
-from app.schemas.integration import IntegrationIn, IntegrationPatch
+from app.schemas.integration import CapabilityOut, IntegrationIn, IntegrationPatch
 from app.schemas.platform import IntegrationOut
 from app.services import integration_service
 
@@ -38,6 +39,21 @@ def _uit(rij) -> IntegrationOut:
         last_checked_at=rij.last_checked_at,
         has_credentials=rij.credentials_encrypted is not None,
     )
+
+
+@router.get("/catalog", response_model=list[CapabilityOut])
+async def catalog(
+    user: User = Depends(require_permission("integrations.read")),
+    session: AsyncSession = Depends(get_session),
+):
+    """Elke functie van Ganz met de sleutels die hij nodig heeft, en of ze er zijn.
+
+    Dit is het overzicht waarmee één scherm kan laten zien wat er nog mist, in plaats van
+    dat je per functie moet uitproberen of er iets gebeurt. Let op `wired`: staat die op
+    false, dan is de plek er wel maar doet invullen nog niets — dat liever zichtbaar dan
+    verstopt.
+    """
+    return await integration_service.catalog_status(session, user.id, settings=get_settings())
 
 
 @router.post("", response_model=IntegrationOut, status_code=status.HTTP_201_CREATED)

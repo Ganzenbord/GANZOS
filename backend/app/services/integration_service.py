@@ -18,6 +18,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.integrations import catalog
+from app.integrations.base import ProviderNotConfigured
 from app.models.activity import ActivityAction
 from app.models.platform import Integration, IntegrationStatus
 from app.services.activity_service import log_activity
@@ -128,3 +130,111 @@ async def credentials_for(
     if rij is None:
         return None
     return get_vault().decrypt(rij.credentials_encrypted)
+
+
+# --- De catalogus: welke functie welke sleutel nodig heeft --------------------
+
+
+async def require_credentials(
+    session: AsyncSession, user_id: int, key: str
+) -> dict[str, Any]:
+    """De sleutels van één functie, of een nette weigering.
+
+    Dit is de aanroep die elke functie hoort te doen in plaats van zelf in de database te
+    kijken. Hij doet drie dingen die je anders op vijftien plekken opnieuw schrijft: hij
+    weet welke velden deze functie nodig heeft, hij zegt in gewone taal wat er mist, en hij
+    zegt waar je het moet invullen.
+
+    Wat hij níét doet: een half ingevulde koppeling doorlaten. Een functie die met een
+    ontbrekend veld begint, faalt halverwege — en bij een upload of een mail is halverwege
+    de slechtste plek om te stoppen.
+    """
+    plek = catalog.capability(key)
+    naam = plek.name if plek else key
+
+    if plek is not None and plek.store is not catalog.Store.INTEGRATION:
+        raise ProviderNotConfigured(
+            f"De sleutels van {naam} staan niet in de kluis maar hier: "
+            f"{catalog.WAAR_UITLEG[plek.store]}"
+        )
+
+    gegevens = await credentials_for(session, user_id, key)
+    if not gegevens:
+        waar = catalog.WAAR_UITLEG[catalog.Store.INTEGRATION]
+        raise ProviderNotConfigured(f"{naam} is nog niet gekoppeld. {waar}")
+
+    if plek is not None:
+        ontbreekt = [veld.label for veld in plek.fields if not gegevens.get(veld.name)]
+        if ontbreekt:
+            raise ProviderNotConfigured(
+                f"De koppeling met {naam} is niet compleet. Nog invullen: "
+                f"{', '.join(ontbreekt)}."
+            )
+    return gegevens
+
+
+async def catalog_status(
+    session: AsyncSession, user_id: int, *, settings: Any
+) -> list[dict[str, Any]]:
+    """Per functie: wat hij kan, welke sleutels hij nodig heeft en of ze er zijn.
+
+    Hier komt **nooit een sleutel** uit, alleen de namen van velden die nog ontbreken. Dat
+    onderscheid is het hele punt: je moet kunnen zien dat `signing_secret` leeg is zonder
+    dat iemand `bot_token` kan lezen.
+    """
+    rijen = {rij.key: rij for rij in await list_integrations(session, user_id)}
+
+    uit: list[dict[str, Any]] = []
+    for plek in catalog.CATALOG:
+        ontbreekt: list[str] = []
+        if not plek.fields:
+            # Niet elke functie heeft een sleutel nodig (de Binance-bulkdata bijvoorbeeld
+            # alleen netwerktoegang). "Ingevuld" melden zou suggereren dat jij iets hebt
+            # gedaan wat niet nodig was.
+            staat = "no_key_needed"
+        elif plek.store is catalog.Store.INTEGRATION:
+            rij = rijen.get(plek.key)
+            if rij is None or rij.credentials_encrypted is None:
+                staat = "missing"
+                ontbreekt = [veld.name for veld in plek.fields]
+            else:
+                # Ontsleutelen om te zien welke velden er zijn. Alleen de námen gaan naar
+                # buiten; de waarden blijven in dit proces.
+                gegevens = get_vault().decrypt(rij.credentials_encrypted) or {}
+                ontbreekt = [veld.name for veld in plek.fields if not gegevens.get(veld.name)]
+                staat = "incomplete" if ontbreekt else "connected"
+        elif plek.store is catalog.Store.SERVER:
+            ontbreekt = [
+                veld.name for veld in plek.fields if not getattr(settings, veld.name, None)
+            ]
+            staat = "missing" if ontbreekt else "connected"
+        else:
+            # Per kanaal of per rekening: of die er zijn, hangt van het kanaal af en niet
+            # van de gebruiker. Hier alleen zeggen waar het hoort.
+            staat = "elsewhere"
+
+        uit.append(
+            {
+                "key": plek.key,
+                "name": plek.name,
+                "category": plek.category,
+                "purpose": plek.purpose,
+                "store": plek.store.value,
+                "where": catalog.WAAR_UITLEG[plek.store],
+                "docs_url": plek.docs_url,
+                "wired": plek.wired,
+                "note": plek.note,
+                "state": staat,
+                "missing_fields": ontbreekt,
+                "fields": [
+                    {
+                        "name": veld.name,
+                        "label": veld.label,
+                        "masked": veld.masked,
+                        "hint": veld.hint,
+                    }
+                    for veld in plek.fields
+                ],
+            }
+        )
+    return uit
