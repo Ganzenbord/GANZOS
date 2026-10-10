@@ -349,6 +349,56 @@ En dan de rekening die je in die tijd wél betaalt:
 **Dat is het getal dat dit plan kan breken, en het is niet de marge.** De marge is ruim; het
 gat tussen de eerste rekening en de eerste uitbetaling is dat niet.
 
+### De regel die Stef koos, en die nu in code staat
+
+> Kanaal 2 begint pas als kanaal 1 minstens €6.000 per maand haalt. Kanaal 3 als kanaal 2
+> €3.000 tot €6.000 haalt. En zo verder.
+
+Dat is een goede regel, en hij haalt het risico uit het vorige stuk volledig weg: je begint
+met **$297 tot $442 per maand** in plaats van $8.840, en je breidt alleen uit met geld dat
+er al is. De vraag "kunnen we dit dragen" is daarmee geen vraag meer.
+
+Omdat zo'n regel een beslissing over geld is, staat hij nu als functie in
+`app/channels/gate.py` met elf tests, in plaats van als afspraak die je zelf moet nalopen.
+Daar zat namelijk precies twee valkuilen in.
+
+**1. December lijkt altijd op succes.** De advertentietarieven op YouTube zijn in november en
+december het hoogst van het jaar en in januari het laagst; de daling van december naar
+januari wordt geschat op 20 tot 50 procent (de bronnen variëren, geen ervan is YouTube
+zelf). Een kanaal dat in december €6.000 haalt, kan in januari op €3.000 tot €4.800 staan
+zonder dat er iets veranderd is. **Een poort die op één maand afgaat, gaat dus elke december
+open en blijkt elke januari te vroeg** — en dan heb je kanaal 2 opgestart op een getal dat
+er niet was.
+
+De poort rekent daarom met het gemiddelde over **drie afgesloten maanden**, met een
+ondergrens per maand van de helft (één uitschieter tussen twee magere maanden is geen
+groei), en zegt erbij of het venster in de piek van het jaar lag. Haalt de laatste maand het
+op zichzelf wél, dan staat dat er ook — anders lijkt de poort kapot.
+
+**2. De maand die nu loopt is geen maand.** YouTube geeft omzet van de eerste van de maand
+tot vandaag, dus elke meting is een stand-tot-nu. Zou je die meetellen, dan kijk je op de
+derde van de maand naar drie dagen omzet en concludeer je dat het kanaal instort. De functie
+gooit de lopende maand eruit en neemt per afgesloten maand de laatste meting.
+
+En één ding dat de functie met opzet niet doet: valuta omrekenen. Komt de omzet in dollars
+binnen terwijl de poort in euro's staat, dan is dat een fout en geen klusje. In dit project
+is één keer een koers de verkeerde kant op gegaan, en dat kostte een positie van 15% te klein
+zonder dat iemand het zag.
+
+### De prijs van deze regel, zodat je hem kent
+
+Eén ding dat met één kanaal niet te weten is: **of de machine werkt, of dat deze ene niche
+werkt.** Met N=1 kun je die twee niet onderscheiden — en dat is precies waar het Quant Lab
+over struikelde. Blijft kanaal 1 onder €6.000, dan weet je over een jaar nog niet of je
+twintig kanalen had moeten hebben of nul.
+
+Daarom staat de poort voor kanaal 2 hoog (€6.000) en voor kanaal 3 en verder lager
+(€3.000): na twee kanalen weet je wél welke van de twee vragen je aan het beantwoorden bent.
+Wil je dat eerder weten, dan is de goedkope variant kanaal 2 openen bij het bereiken van het
+Partner Program plus drie maanden groei in plaats van bij €6.000 — dat kost $400 per maand en
+koopt het antwoord op de vraag die voor twintig kanalen telt. Maar dat is een afweging en geen
+correctie: de regel zoals hij er staat, is te verdedigen en kost bijna niets.
+
 ### Waar komt die €3–8k vandaan?
 
 Als dat cijfer uit onderzoek naar kanalen in een niche komt — en met Nexlev erbij is dat
