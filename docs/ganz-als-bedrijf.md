@@ -293,6 +293,79 @@ drie uur in één keer helemaal niet kan, en dan is samenstellen niet een bezuin
 enige weg. Voor de kanalen van een kwartier geldt hetzelfde in mindere mate: hoeveel van die
 vijftien minuten moet echt nieuw beeld zijn?
 
+### Break-even is een tiende van wat je denkt
+
+Stef rekent op ongeveer €3.000 tot €8.000 per kanaal per maand. Als dat klopt, zijn de
+kosten hierboven ruis: een kanaal van een kwartier kost **$297 tot $442 per maand** aan
+beeld, dus bij €3.000 omzet is dat een marge van ongeveer zeven keer. Die vraag is daarmee
+beantwoord: ja, dat is makkelijk te doen.
+
+Maar het getal dat beslissingen hoort te sturen is niet €3.000 — het is $442. Zoveel moet
+een kanaal opbrengen om niets te kosten:
+
+| RPM (opbrengst per 1.000 weergaven) | Weergaven per maand om quitte te staan |
+| --- | --- |
+| $4 (lage niche) | 74.000 – 110.000 |
+| $8 (gemiddeld) | 37.000 – 55.000 |
+| $15 (hoge niche) | 20.000 – 29.000 |
+
+En zoveel zou €3.000 tot €8.000 per maand vragen:
+
+| | Weergaven per maand | Per video |
+| --- | --- | --- |
+| €3.000 bij RPM $8 | 405.000 | 37.000 |
+| €8.000 bij RPM $8 | 1.080.000 | 100.000 |
+
+Dat is een factor tien tot twintig boven break-even. **€3–8k is het succesgeval, niet het
+overlevingsgeval** — en dat is goed nieuws, want het betekent dat een kanaal al veel eerder
+geen geld meer kost dan waar je op rekent.
+
+### Het echte risico is de maanden met nul inkomsten
+
+Een kanaal verdient **niets** tot het in het YouTube Partner Program zit: 1.000 abonnees
+plus 4.000 uur openbare kijktijd in twaalf maanden (of 10 miljoen Shorts-weergaven in 90
+dagen). Daar valt niet omheen te rekenen.
+
+Twee dingen daarover, en het eerste is gunstig:
+
+**Video's van een kwartier halen die kijktijd snel.** Vier­duizend uur is bij 50% gekeken van
+vijftien minuten ongeveer **32.000 weergaven**, bij 30% ongeveer 53.000. Vergelijk dat met
+10 miljoen Shorts-weergaven. Jullie formaatkeuze is voor het bereiken van de drempel de
+goede.
+
+**Maar er is een verandering aangekondigd die je moet nakijken.** Eén gids uit 2026 schrijft
+dat de drempel per **1 februari 2027** naar 1.000 abonnees plus **8.000** uur gaat. Ik vond
+dat bij één bron en niet bij Google zelf, dus het is niet geverifieerd — maar het is vier
+maanden weg en het verdubbelt de eis. Kijk het na op YouTube's eigen pagina voordat de
+planning eraan hangt.
+
+En dan de rekening die je in die tijd wél betaalt:
+
+| Hoe je begint | Per maand | Na zes maanden zonder inkomsten |
+| --- | --- | --- |
+| 20 kanalen tegelijk | $8.840 | **$53.000 uitgegeven, €0 verdiend** |
+| 3 kanalen | $1.326 | $7.956 |
+
+**Dat is het getal dat dit plan kan breken, en het is niet de marge.** De marge is ruim; het
+gat tussen de eerste rekening en de eerste uitbetaling is dat niet.
+
+### Waar komt die €3–8k vandaan?
+
+Als dat cijfer uit onderzoek naar kanalen in een niche komt — en met Nexlev erbij is dat
+waarschijnlijk — dan hoort er één waarschuwing bij die precies dezelfde is als die uit het
+Quant Lab: **de kanalen die je kunt zien zijn de kanalen die het hebben gered.** Het
+gemiddelde van de zichtbare kanalen is niet het gemiddelde van de begonnen kanalen. In het
+lab bleek dat hard: de beste tien instellingen van het ene corpus stonden op het andere
+gemiddeld op plek 31 van de 50.
+
+Dat is geen reden om het niet te doen. Het is de reden om het getal te meten in plaats van
+aan te nemen, en dat kan: met drie kanalen in drie niches weet je over een paar maanden je
+**eigen** RPM en je **eigen** weergaven. Dan is opschalen naar twintig een beslissing met
+cijfers in plaats van een gok — en de vaste kosten van GANZ zelf veranderen er niet van of
+je drie of twintig kanalen draait.
+
+Zelfde bestemming, een zevende van het risico.
+
 **Daarom blijft "één kanaal helemaal rond" stap vier en niet stap tien:** die stap levert
 het werkelijke bedrag per video, en dat bedrag bepaalt of twintig kanalen een bedrijf is of
 een hobby met een rekening.
