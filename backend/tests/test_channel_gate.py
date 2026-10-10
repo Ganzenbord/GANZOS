@@ -44,8 +44,6 @@ def test_een_decembermaand_opent_de_poort_niet_in_zijn_eentje() -> None:
     De advertentietarieven zijn in december het hoogst van het jaar en in januari het
     laagst. Een poort die op één maand afgaat, gaat dus elke december open en blijkt elke
     januari te vroeg."""
-    # Boven de ondergrens per maand, zodat deze test alléén over de decemberpiek gaat en
-    # niet per ongeluk op de ondergrens afketst.
     uitkomst = evaluate(
         (maand(2026, 10, "3200"), maand(2026, 11, "3500"), maand(2026, 12, "6500")),
         rule_for_channel(2),
@@ -54,8 +52,9 @@ def test_een_decembermaand_opent_de_poort_niet_in_zijn_eentje() -> None:
     assert uitkomst.passed is False
     # En het scherm kan uitleggen waarom het tóch niet doorgaat.
     assert uitkomst.latest_month_would_pass is True
-    assert "geen trend" in uitkomst.explanation
-    assert "december" in uitkomst.explanation
+    assert "2026-10, 2026-11" in uitkomst.explanation
+    # December is een piekmaand, dus die opmerking hoort er hier wél bij.
+    assert "piekmaand" in uitkomst.explanation
 
 
 def test_een_venster_dat_helemaal_in_de_piek_valt_krijgt_een_waarschuwing() -> None:
@@ -64,9 +63,10 @@ def test_een_venster_dat_helemaal_in_de_piek_valt_krijgt_een_waarschuwing() -> N
         GateRule(threshold=Decimal("6000"), window_months=2),
         today=date(2027, 1, 10),
     )
+    # Allebei boven de grens, dus de poort gaat open — maar niet zonder de waarschuwing.
     assert uitkomst.passed is True
     assert uitkomst.season_warning is not None
-    assert "geflatteerd" in uitkomst.season_warning
+    assert "álle maanden" in uitkomst.season_warning
 
 
 def test_een_gewoon_venster_krijgt_geen_waarschuwing() -> None:
@@ -134,17 +134,49 @@ def test_te_weinig_maanden_is_geen_nee_maar_te_vroeg() -> None:
     assert "2 maand" in uitkomst.explanation
 
 
-def test_een_uitschieter_tussen_twee_magere_maanden_haalt_het_niet() -> None:
-    """Gemiddeld €6.000, maar twee van de drie maanden ver onder de helft. Zonder
-    ondergrens per maand zou dit de poort openen."""
+def test_gemiddeld_zesduizend_is_niet_hetzelfde_als_consistent_zesduizend() -> None:
+    """Dit is het verschil tussen de twee regels, en de reden dat Stef de strengere koos.
+
+    €1.000, €1.000 en €16.000 is gemiddeld precies €6.000. Het is geen kanaal dat €6.000 per
+    maand verdient; het is een kanaal met één uitschieter. Op een gemiddelde zou de poort
+    hier opengaan."""
+    cijfers = (maand(2027, 3, "1000"), maand(2027, 4, "1000"), maand(2027, 5, "16000"))
+
+    streng = evaluate(cijfers, rule_for_channel(2), today=date(2027, 6, 2))
+    assert streng.trailing_average == Decimal("6000")
+    assert streng.passed is False
+    assert "niet gemiddeld" in streng.explanation
+
+    # En zo zou het zijn gegaan met de zachtere regel: precies de verkeerde beslissing.
+    zacht = evaluate(
+        cijfers,
+        GateRule(threshold=Decimal("6000"), window_months=3, every_month=False),
+        today=date(2027, 6, 2),
+    )
+    assert zacht.passed is True
+
+
+def test_drie_maanden_achter_elkaar_net_boven_de_grens_haalt_het_wel() -> None:
+    """Consistent betekent niet "ruim": precies de grens is genoeg, drie maanden achter
+    elkaar."""
     uitkomst = evaluate(
-        (maand(2027, 3, "1000"), maand(2027, 4, "1000"), maand(2027, 5, "16000")),
+        (maand(2027, 3, "6000"), maand(2027, 4, "6000"), maand(2027, 5, "6000")),
         rule_for_channel(2),
         today=date(2027, 6, 2),
     )
-    assert uitkomst.trailing_average == Decimal("6000")
+    assert uitkomst.passed is True
+    assert "achter elkaar" in uitkomst.explanation
+
+
+def test_een_maand_net_onder_de_grens_houdt_de_poort_dicht() -> None:
+    """Eén euro te weinig is te weinig. Een regel met een onduidelijke rand is geen regel."""
+    uitkomst = evaluate(
+        (maand(2027, 3, "6000"), maand(2027, 4, "5999"), maand(2027, 5, "9000")),
+        rule_for_channel(2),
+        today=date(2027, 6, 2),
+    )
     assert uitkomst.passed is False
-    assert "ondergrens" in uitkomst.explanation
+    assert "2027-04" in uitkomst.explanation
 
 
 def test_het_derde_kanaal_heeft_een_lagere_poort() -> None:
@@ -166,3 +198,51 @@ def test_zonder_cijfers_is_het_antwoord_te_vroeg_en_geen_nul() -> None:
     assert uitkomst.passed is False
     assert uitkomst.months_measured == 0
     assert "te vroeg" in uitkomst.explanation
+
+
+# --- De uitleg moet waar zijn, niet alleen behulpzaam ------------------------
+
+
+def test_de_decemberopmerking_staat_er_alleen_bij_een_piekmaand() -> None:
+    """Deze tekst stond er eerst altijd bij. Bij een uitschieter in mei is "juist in
+    december" gewoon niet waar, en een uitleg die niet klopt is erger dan geen uitleg."""
+    mei = evaluate(
+        (maand(2027, 3, "1000"), maand(2027, 4, "1000"), maand(2027, 5, "16000")),
+        rule_for_channel(2),
+        today=date(2027, 6, 2),
+    )
+    assert mei.latest_month_would_pass is True
+    assert "piekmaand" not in mei.explanation
+
+    december = evaluate(
+        (maand(2026, 10, "1000"), maand(2026, 11, "1000"), maand(2026, 12, "16000")),
+        rule_for_channel(2),
+        today=date(2027, 1, 5),
+    )
+    assert "piekmaand" in december.explanation
+
+
+def test_beslissen_op_het_hoogtepunt_krijgt_de_zwaarste_waarschuwing() -> None:
+    """Drie maanden consistent boven de grens, maar de laatste is december: dan sta je op
+    het hoogtepunt van het jaar te beslissen en is de maand erna per definitie slechter."""
+    uitkomst = evaluate(
+        (maand(2026, 10, "6100"), maand(2026, 11, "6400"), maand(2026, 12, "8000")),
+        rule_for_channel(2),
+        today=date(2027, 1, 5),
+    )
+    assert uitkomst.passed is True
+    assert uitkomst.season_warning is not None
+    assert "hoogtepunt" in uitkomst.season_warning
+    assert "20 tot 50 procent" in uitkomst.season_warning
+
+
+def test_de_waarschuwing_praat_niet_over_het_gemiddelde() -> None:
+    """Het gemiddelde beslist niet meer, dus een waarschuwing erover stuurt je de verkeerde
+    kant op."""
+    uitkomst = evaluate(
+        (maand(2026, 11, "6200"), maand(2026, 12, "7000")),
+        GateRule(threshold=Decimal("6000"), window_months=2),
+        today=date(2027, 1, 10),
+    )
+    assert uitkomst.season_warning is not None
+    assert "gemiddelde" not in uitkomst.season_warning

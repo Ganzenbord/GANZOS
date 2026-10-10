@@ -75,11 +75,22 @@ class MonthRevenue:
 
 @dataclass(frozen=True, slots=True)
 class GateRule:
+    """De voorwaarde om het volgende kanaal te openen.
+
+    `every_month` is het verschil tussen twee regels die op papier hetzelfde lijken:
+
+    - **gemiddeld** €6.000 over drie maanden haalt een kanaal met €1.000, €1.000 en €16.000
+      ook. Dat is geen kanaal dat €6.000 per maand verdient, dat is een kanaal met één
+      uitschieter.
+    - **elke maand** €6.000 is wat Stef bedoelde met "minimaal 3 maanden consistent": drie
+      maanden achter elkaar, elk op of boven de grens.
+
+    Het gemiddelde wordt nog wel berekend en gemeld, maar het beslist niet.
+    """
+
     threshold: Decimal
     window_months: int = DEFAULT_WINDOW_MONTHS
-    # Een ondergrens die élke maand in het venster moet halen. Zonder dit haalt een kanaal
-    # met één uitschieter en twee magere maanden het gemiddelde alsnog.
-    floor_each_month: Decimal | None = None
+    every_month: bool = True
     currency: str = "EUR"
 
 
@@ -133,18 +144,34 @@ def monthly_totals(
 
 
 def _seizoenswaarschuwing(venster: tuple[MonthRevenue, ...], today: date) -> str | None:
+    """Of dit venster in de piek van het jaar valt, en hoe erg dat is.
+
+    De zwaarste waarschuwing hoort bij het geval waarin de láátste maand een piekmaand is:
+    dan neem je de beslissing op het hoogtepunt van de cyclus, en de maand erna is per
+    definitie slechter.
+    """
     pieken = [m.label for m in venster if m.month in PIEKMAANDEN]
     if not pieken:
         return None
+
+    staart = "De advertentietarieven zijn in november en december het hoogst van het jaar en "
+    staart += "in januari het laagst; de daling wordt op 20 tot 50 procent geschat."
+
     if len(pieken) == len(venster):
         return (
-            f"Let op: alle maanden in dit venster ({', '.join(pieken)}) vallen in de piek van "
-            "het jaar. De advertentietarieven zijn dan het hoogst en in januari het laagst — "
-            "dit gemiddelde is dus geflatteerd. Wacht een maand of twee met deze beslissing."
+            f"Let op: álle maanden in dit venster ({', '.join(pieken)}) vallen in de piek van "
+            f"het jaar. {staart} Deze cijfers zeggen dus niets over een gewone maand — wacht "
+            "met deze beslissing tot er een maand buiten de piek bij staat."
+        )
+    if venster[-1].month in PIEKMAANDEN:
+        return (
+            f"Let op: de laatste maand ({venster[-1].label}) is een piekmaand, dus je staat op "
+            f"het hoogtepunt van het jaar te beslissen. {staart} Eén maand wachten laat zien "
+            "of het blijft staan."
         )
     return (
-        f"Let op: {', '.join(pieken)} valt in de piek van het jaar, dus dit gemiddelde ligt "
-        "iets hoger dan een gewone maand. In januari zakken de tarieven weer."
+        f"Let op: {', '.join(pieken)} valt in de piek van het jaar en ligt daardoor hoger dan "
+        f"een gewone maand. {staart}"
     )
 
 
@@ -176,59 +203,72 @@ def evaluate(
     gemiddelde = sum((m.amount for m in venster), Decimal("0")) / Decimal(len(venster))
     laatste = venster[-1]
     laatste_haalt = laatste.amount >= rule.threshold
-
-    onder = [m for m in venster if rule.floor_each_month is not None
-             and m.amount < rule.floor_each_month]
-
     waarschuwing = _seizoenswaarschuwing(venster, today)
     valuta = rule.currency
+    reeks = ", ".join(f"{m.label} {valuta} {m.amount:.0f}" for m in venster)
 
-    if onder:
+    if rule.every_month:
+        onder = [m for m in venster if m.amount < rule.threshold]
+        if onder:
+            uitleg = (
+                f"Nog niet: {', '.join(m.label for m in onder)} bleef onder {valuta} "
+                f"{rule.threshold:.0f}. De regel vraagt {rule.window_months} maanden achter "
+                f"elkaar op of boven die grens, niet gemiddeld. ({reeks}.)"
+            )
+            if laatste_haalt:
+                # Zonder deze zin lijkt de poort kapot op het moment dat hij het hardst nodig
+                # is. De opmerking over december hoort er alleen bij als de laatste maand
+                # écht een piekmaand is — anders staat er iets wat niet waar is.
+                uitleg += f" {laatste.label} haalde het wél, maar de maanden ervoor niet."
+                if laatste.month in PIEKMAANDEN:
+                    uitleg += (
+                        " En juist in een piekmaand is één goede maand extra verraderlijk."
+                    )
+            return GateVerdict(
+                passed=False,
+                trailing_average=gemiddelde,
+                months_measured=len(months),
+                explanation=uitleg,
+                latest_month_would_pass=laatste_haalt,
+                season_warning=waarschuwing,
+                months=months,
+            )
         return GateVerdict(
-            passed=False,
+            passed=True,
             trailing_average=gemiddelde,
             months_measured=len(months),
             explanation=(
-                f"Het gemiddelde over {rule.window_months} maanden is {valuta} "
-                f"{gemiddelde:.0f}, maar {', '.join(m.label for m in onder)} bleef onder de "
-                f"ondergrens van {valuta} {rule.floor_each_month:.0f}. Eén goede maand tussen "
-                "twee magere is geen groei."
+                f"De poort is open: {rule.window_months} maanden achter elkaar op of boven "
+                f"{valuta} {rule.threshold:.0f} ({reeks})."
             ),
             latest_month_would_pass=laatste_haalt,
             season_warning=waarschuwing,
             months=months,
         )
 
+    # De zachtere variant: op het gemiddelde. Staat er omdat hij als tweede, vroegere poort
+    # bruikbaar is, maar hij is niet de regel voor het opschalen.
     if gemiddelde >= rule.threshold:
         return GateVerdict(
             passed=True,
             trailing_average=gemiddelde,
             months_measured=len(months),
             explanation=(
-                f"De poort is open: {valuta} {gemiddelde:.0f} gemiddeld over "
-                f"{rule.window_months} maanden ({', '.join(m.label for m in venster)}), en de "
-                f"grens staat op {valuta} {rule.threshold:.0f}."
+                f"De poort is open op het gemiddelde: {valuta} {gemiddelde:.0f} over "
+                f"{rule.window_months} maanden ({reeks})."
             ),
             latest_month_would_pass=laatste_haalt,
             season_warning=waarschuwing,
             months=months,
         )
-
-    uitleg = (
-        f"Nog niet: {valuta} {gemiddelde:.0f} gemiddeld over {rule.window_months} maanden, "
-        f"en de grens staat op {valuta} {rule.threshold:.0f}."
-    )
-    if laatste_haalt:
-        # Dit is het geval waar de regel voor bestaat. Zonder deze zin lijkt de poort kapot.
-        uitleg += (
-            f" {laatste.label} haalde het op zichzelf wél ({valuta} {laatste.amount:.0f}), "
-            "maar één maand is geen trend — en in december is dat extra verraderlijk."
-        )
     return GateVerdict(
         passed=False,
         trailing_average=gemiddelde,
         months_measured=len(months),
-        explanation=uitleg,
+        explanation=(
+            f"Nog niet: {valuta} {gemiddelde:.0f} gemiddeld over {rule.window_months} "
+            f"maanden, en de grens staat op {valuta} {rule.threshold:.0f}. ({reeks}.)"
+        ),
         latest_month_would_pass=laatste_haalt,
         season_warning=waarschuwing,
         months=months,
@@ -248,7 +288,7 @@ def rule_for_channel(number: int, *, window_months: int = DEFAULT_WINDOW_MONTHS)
     return GateRule(
         threshold=drempel,
         window_months=window_months,
-        # De helft van de drempel als ondergrens per maand: één uitschieter mag het
-        # gemiddelde niet in zijn eentje over de grens trekken.
-        floor_each_month=drempel / 2,
+        # Elke maand, niet gemiddeld: "minimaal 3 maanden consistent" betekent drie maanden
+        # achter elkaar op of boven de grens.
+        every_month=True,
     )

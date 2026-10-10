@@ -351,8 +351,8 @@ gat tussen de eerste rekening en de eerste uitbetaling is dat niet.
 
 ### De regel die Stef koos, en die nu in code staat
 
-> Kanaal 2 begint pas als kanaal 1 minstens €6.000 per maand haalt. Kanaal 3 als kanaal 2
-> €3.000 tot €6.000 haalt. En zo verder.
+> Kanaal 2 begint pas als kanaal 1 **minimaal drie maanden achter elkaar** €6.000 haalt.
+> Kanaal 3 als kanaal 2 dat met €3.000 doet. En zo verder.
 
 Dat is een goede regel, en hij haalt het risico uit het vorige stuk volledig weg: je begint
 met **$297 tot $442 per maand** in plaats van $8.840, en je breidt alleen uit met geld dat
@@ -370,10 +370,25 @@ zonder dat er iets veranderd is. **Een poort die op één maand afgaat, gaat dus
 open en blijkt elke januari te vroeg** — en dan heb je kanaal 2 opgestart op een getal dat
 er niet was.
 
-De poort rekent daarom met het gemiddelde over **drie afgesloten maanden**, met een
-ondergrens per maand van de helft (één uitschieter tussen twee magere maanden is geen
-groei), en zegt erbij of het venster in de piek van het jaar lag. Haalt de laatste maand het
-op zichzelf wél, dan staat dat er ook — anders lijkt de poort kapot.
+De poort vraagt daarom **drie afgesloten maanden achter elkaar** op of boven de grens — en
+dat is iets anders dan gemiddeld, wat de reden is dat Stef het zo scherp stelde:
+
+| Drie maanden | Gemiddeld | Consistent |
+| --- | --- | --- |
+| €1.000, €1.000, €16.000 | €6.000, **poort open** | **dicht**: twee maanden onder de grens |
+| €6.000, €6.000, €6.000 | €6.000, poort open | **open** |
+
+Het eerste geval is geen kanaal dat €6.000 per maand verdient; het is een kanaal met één
+uitschieter. Op een gemiddelde zou je daarop opschalen.
+
+De poort zegt er ook bij of het venster in de piek van het jaar lag, en de zwaarste
+waarschuwing hoort bij het geval waarin de **laatste** maand een piekmaand is: dan beslis je
+op het hoogtepunt van de cyclus en is de maand erna per definitie slechter. Drie maanden
+consistent €6.000 die eindigen in december is dus wél open, met de kanttekening dat één maand
+wachten laat zien of het blijft staan.
+
+En haalde de laatste maand het op zichzelf wél terwijl de maanden ervoor niet, dan staat dat
+er ook — anders lijkt de poort kapot op het moment dat hij het hardst nodig is.
 
 **2. De maand die nu loopt is geen maand.** YouTube geeft omzet van de eerste van de maand
 tot vandaag, dus elke meting is een stand-tot-nu. Zou je die meetellen, dan kijk je op de
@@ -392,8 +407,9 @@ werkt.** Met N=1 kun je die twee niet onderscheiden — en dat is precies waar h
 over struikelde. Blijft kanaal 1 onder €6.000, dan weet je over een jaar nog niet of je
 twintig kanalen had moeten hebben of nul.
 
-Daarom staat de poort voor kanaal 2 hoog (€6.000) en voor kanaal 3 en verder lager
-(€3.000): na twee kanalen weet je wél welke van de twee vragen je aan het beantwoorden bent.
+Daarom staat de poort voor kanaal 2 hoog (€6.000, drie maanden achter elkaar) en voor kanaal
+3 en verder lager (€3.000, met dezelfde eis van drie maanden): na twee kanalen weet je wél
+welke van de twee vragen je aan het beantwoorden bent.
 Wil je dat eerder weten, dan is de goedkope variant kanaal 2 openen bij het bereiken van het
 Partner Program plus drie maanden groei in plaats van bij €6.000 — dat kost $400 per maand en
 koopt het antwoord op de vraag die voor twintig kanalen telt. Maar dat is een afweging en geen
