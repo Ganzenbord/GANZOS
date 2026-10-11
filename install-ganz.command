@@ -133,20 +133,50 @@ print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())
   let_op "koppeling (YouTube en de rest) opnieuw maken."
 fi
 
+# De lange stappen hieronder zijn stil zolang ze lukken en luid zodra ze mislukken. Dat is
+# niet alleen netjes: een stap die met --quiet faalt, laat iemand achter met "het werkt
+# niet" en geen enkele aanwijzing. De hele uitvoer blijft in logs/ staan.
+mkdir -p logs
+
+probeer() {
+  # probeer <logbestand> <uitleg bij mislukken> -- <opdracht...>
+  local logbestand="$1"; shift
+  local uitleg="$1"; shift
+  shift  # de --
+  if "$@" >"logs/$logbestand" 2>&1; then
+    return 0
+  fi
+  printf '\n'
+  tail -25 "logs/$logbestand"
+  printf '\n'
+  stop "$uitleg
+   Hierboven staan de laatste regels; alles staat in logs/$logbestand"
+}
+
 # --- De backend ---------------------------------------------------------------
 stap "De backend installeren (dit duurt het langst)"
 [ -d backend/.venv ] || python3.12 -m venv backend/.venv
-backend/.venv/bin/pip install --quiet --upgrade pip
-backend/.venv/bin/pip install --quiet -r backend/requirements.txt
+probeer pip-upgrade.log "Pip bijwerken mislukte." -- \
+  backend/.venv/bin/pip install --quiet --upgrade pip
+probeer pip-install.log "De pakketten van de backend installeren mislukte." -- \
+  backend/.venv/bin/pip install --quiet -r backend/requirements.txt
 goed "Pakketten van de backend geïnstalleerd"
 
 stap "De database inrichten"
-(cd backend && .venv/bin/python -m alembic upgrade head >/dev/null)
+# Alembic moet vanuit backend/ draaien: zowel script_location als prepend_sys_path in
+# alembic.ini zijn relatief, dus met -c vanaf hier zoekt hij de migraties op de verkeerde
+# plek en vindt hij `app` niet.
+inrichten() { (cd backend && .venv/bin/python -m alembic upgrade head); }
+probeer migratie.log "De database inrichten mislukte.
+   Komt die database uit een oudere Ganz, dan is opnieuw beginnen het makkelijkst:
+     dropdb ganz
+   en daarna dit bestand nog een keer." -- inrichten
 goed "Tabellen staan klaar"
 
 # --- Het scherm ---------------------------------------------------------------
 stap "Het scherm installeren"
-npm install --prefix frontend --silent
+probeer npm-install.log "Het installeren van het scherm mislukte." -- \
+  npm install --prefix frontend --no-audit --no-fund
 goed "Pakketten van het scherm geïnstalleerd"
 
 # --- De eerste gebruiker ------------------------------------------------------
